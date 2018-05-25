@@ -113,10 +113,6 @@
         imgData.data[i+3] = 255;
       }
 
-      function fillAreasLinesNaive(){
-
-      }
-
       function VorPoint(x, y){
         this.x = x;
         this.y = y;
@@ -144,13 +140,6 @@
       function colorFromArray(array){
         return "rgb(" + array.join(",") + ")";
       }
-
-      /*function Triangle(){
-      }
-
-      Triangle.prototype = {
-        vertices = []
-      }*/
 
       function sqDistanceTo(x, y){
         var a = this.x - x;
