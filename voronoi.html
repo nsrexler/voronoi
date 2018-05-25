@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Voronoi Generator</title>
+    <script type="text/javascript">//<![CDATA[
+      "use strict";
+
+      function initVoronoi(vor){
+        vor.canvas = vor.querySelector("canvas");
+        vor.canvas.ctx = vor.canvas.getContext("2d");
+        vor.canvas.points = [];
+        vor.canvas.clearAll = clearAll;
+        vor.canvas.drawPoints = drawPoints;
+        vor.canvas.fillAreas = fillAreasBrute;
+        vor.pointCount = vor.querySelector(".pointCount");
+
+        var genPoints = vor.querySelector(".genPoints");
+        genPoints.vor = vor;
+        genPoints.addEventListener("click", generatePoints);
+
+        var drawBtn = vor.querySelector(".drawBtn");
+        drawBtn.vor = vor;
+        drawBtn.addEventListener("click", drawDiagram);
+
+        var colorBtn = vor.querySelector(".colorChange");
+        colorBtn.vor = vor;
+        colorBtn.addEventListener("click", changeColors);
+
+        var downBtn = vor.querySelector(".download");
+        downBtn.vor = vor;
+        downBtn.addEventListener("click", downloadImage);
+      }
+
+      function generatePoints(evt){
+        var vor = this.vor;
+
+        var numPoints = vor.pointCount.valueAsNumber;
+
+        vor.canvas.points = new Array(numPoints);
+        for(var i = 0; i < numPoints; i++){
+          vor.canvas.points[i] = new VorPoint(Math.floor(Math.random() * (vor.canvas.width + 1)), Math.floor(Math.random() * (vor.canvas.height + 1)));
+        }
+
+        /*var pointSpacing = 20;
+        var isOdd = false;
+        for(var y = pointSpacing / 2; y < vor.canvas.height; y += pointSpacing){
+          isOdd = !isOdd;
+          for(var x = isOdd ? pointSpacing : pointSpacing / 2; x < vor.canvas.width; x += pointSpacing){
+            vor.canvas.points.push(new VorPoint(x, y));
+          }
+        }*/
+
+        vor.canvas.clearAll();
+        vor.canvas.drawPoints();
+
+        vor.querySelector(".drawBtn").disabled = false;
+        vor.querySelector(".colorChange").disabled = true;
+      }
+
+      function clearAll(){
+        this.ctx.clearRect(0, 0, this.width, this.height);
+      }
+
+      function drawPoints(){
+        var ctx = this.ctx;
+        ctx.fillStyle = "#000000";
+        this.points.forEach(function(point){
+          ctx.fillRect(point.x-1, point.y-1, 3, 3);
+        });
+      }
+
+      function drawDiagram(evt){
+        this.vor.canvas.fillAreas();
+        this.vor.querySelector(".colorChange").disabled = false;
+      }
+
+      function changeColors(evt){
+        this.vor.canvas.points.forEach(function(point){point.colorArray = randomColor();});
+        this.vor.canvas.fillAreas();
+      }
+
+      function downloadImage(evt){
+        var data = this.vor.canvas.toBlob(function(blob){
+          var imgUrl = URL.createObjectURL(blob);
+          var imgLink = document.querySelector("a.imgLink");
+          imgLink.href = imgUrl;
+          imgLink.download = "voronoi.png";
+          imgLink.click();
+        });
+      }
+
+      function fillAreasBrute(){
+        var imgData = this.ctx.createImageData(this.width, this.height);
+        for(var y = 0; y < this.height; y++){
+          for(var x = 0; x < this.width; x++){
+            var closestPoint = this.points.reduce(function(curClosest, curValue){
+              var dist = curValue.sqDistanceTo(x, y);
+              return (curClosest === null || curClosest.distance > dist) ? {point: curValue, distance: dist} : curClosest;
+            }, null).point;
+
+            applyColorToImage(imgData, this.width, x, y, closestPoint.colorArray);
+          }
+        }
+        this.ctx.putImageData(imgData, 0, 0);
+        this.drawPoints();
+      }
+
+      function applyColorToImage(imgData, width, x, y, color){
+        var i = 4 * (y * width + x);
+        imgData.data[i] = color[0];
+        imgData.data[i+1] = color[1];
+        imgData.data[i+2] = color[2];
+        imgData.data[i+3] = 255;
+      }
+
+      function fillAreasLinesNaive(){
+
+      }
+
+      function VorPoint(x, y){
+        this.x = x;
+        this.y = y;
+        this.colorArray = randomColor();
+        //this.color = colorFromArray(this.colorArray);
+      }
+
+      VorPoint.prototype = {
+        x: 0,
+        y: 0,
+        //color: "",
+        colorArray: [],
+        sqDistanceTo: sqDistanceTo,
+        distanceTo: distanceTo
+      };
+
+      function randomChannel(){
+        return Math.floor(Math.random() * 0x100);
+      }
+
+      function randomColor(){
+        return [randomChannel(), randomChannel(), randomChannel()];
+      }
+
+      function colorFromArray(array){
+        return "rgb(" + array.join(",") + ")";
+      }
+
+      /*function Triangle(){
+      }
+
+      Triangle.prototype = {
+        vertices = []
+      }*/
+
+      function sqDistanceTo(x, y){
+        var a = this.x - x;
+        var b = this.y - y;
+        return a*a + b*b;
+      }
+
+      function distanceTo(x, y){
+        return Math.sqrt(this.sqDistanceTo(x, y));
+      }
+
+      window.addEventListener("load", function(){
+        document.querySelectorAll(".voronoi").forEach(initVoronoi);
+      })
+    //]]></script>
+  </head>
+  <body>
+    <div class="voronoi">
+      <canvas width="800" height="600" style="border: 1px solid black;"></canvas>
+      <div class="controls">
+        <label>Number of points: <input class="pointCount" type="number" min="0" value="100" required /></label>
+        <br />
+        <button class="genPoints">Place Points</button>
+        <button class="drawBtn" disabled>Draw Diagram</button>
+        <button class="colorChange" disabled>Change Colors</button>
+        <button class="download">Download Image</button>
+        <a class="imgLink" style="display: none">image download</a>
+      </div>
+    </div>
+  </body>
+</html>
