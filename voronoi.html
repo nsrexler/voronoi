@@ -9,10 +9,12 @@
         vor.canvas = vor.querySelector("canvas");
         vor.canvas.ctx = vor.canvas.getContext("2d");
         vor.canvas.points = [];
+        vor.canvas.isDrawn = false;
         vor.canvas.clearAll = clearAll;
         vor.canvas.drawPoints = drawPoints;
         vor.canvas.fillAreas = fillAreasBrute;
         vor.pointCount = vor.querySelector(".pointCount");
+        vor.canvas.addEventListener("click", addPoint);
 
         var genPoints = vor.querySelector(".genPoints");
         genPoints.vor = vor;
@@ -21,6 +23,10 @@
         var drawBtn = vor.querySelector(".drawBtn");
         drawBtn.vor = vor;
         drawBtn.addEventListener("click", drawDiagram);
+
+        var clearBtn = vor.querySelector(".clear");
+        clearBtn.vor = vor;
+        clearBtn.addEventListener("click", clearPoints);
 
         var colorBtn = vor.querySelector(".colorChange");
         colorBtn.vor = vor;
@@ -58,6 +64,7 @@
       }
 
       function clearAll(){
+        this.isDrawn = false;
         this.ctx.clearRect(0, 0, this.width, this.height);
       }
 
@@ -69,9 +76,22 @@
         });
       }
 
+      function addPoint(evt){
+        var rect = this.getBoundingClientRect();
+        var x = evt.clientX - rect.left;
+        var y = evt.clientY - rect.top;
+        this.points.push(new VorPoint(x, y));
+        this.isDrawn ? this.fillAreas() : this.drawPoints();
+      }
+
       function drawDiagram(evt){
         this.vor.canvas.fillAreas();
         this.vor.querySelector(".colorChange").disabled = false;
+      }
+
+      function clearPoints(evt){
+        this.vor.canvas.points = [];
+        this.vor.canvas.clearAll();
       }
 
       function changeColors(evt){
@@ -103,6 +123,7 @@
         }
         this.ctx.putImageData(imgData, 0, 0);
         this.drawPoints();
+        this.isDrawn = true;
       }
 
       function applyColorToImage(imgData, width, x, y, color){
@@ -164,6 +185,7 @@
         <br />
         <button class="genPoints">Place Points</button>
         <button class="drawBtn" disabled>Draw Diagram</button>
+        <button class="clear">Clear</button>
         <button class="colorChange" disabled>Change Colors</button>
         <button class="download">Download Image</button>
         <a class="imgLink" style="display: none">image download</a>
