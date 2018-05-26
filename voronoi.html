@@ -92,6 +92,8 @@
       function clearPoints(evt){
         this.vor.canvas.points = [];
         this.vor.canvas.clearAll();
+        vor.querySelector(".drawBtn").disabled = true;
+        vor.querySelector(".colorChange").disabled = true;
       }
 
       function changeColors(evt){
@@ -165,7 +167,8 @@
       function sqDistanceTo(x, y){
         var a = this.x - x;
         var b = this.y - y;
-        return a*a + b*b;
+        return a*a + b*b; // Euclidean
+        //return Math.abs(a) + Math.abs(b); // Manhattan
       }
 
       function distanceTo(x, y){
