@@ -115,7 +115,7 @@
         var imgData = this.ctx.createImageData(this.width, this.height);
         for(var y = 0; y < this.height; y++){
           for(var x = 0; x < this.width; x++){
-            var closestPoint = findClosestPoint(this.points, x, y);
+            var closestPoint = findClosestPoint(this.points, x, y).point;
 
             applyColorToImage(imgData, this.width, x, y, closestPoint.colorArray);
           }
@@ -132,7 +132,7 @@
           var x = Math.floor(Math.random() * (this.width + 1));
           var y = Math.floor(Math.random() * (this.height + 1));
 
-          var closestPoint = findClosestPoint(this.points, x, y);
+          var closestPoint = findClosestPoint(this.points, x, y).point;
 
           this.ctx.strokeStyle = closestPoint.color;
           this.ctx.beginPath();
@@ -149,7 +149,7 @@
         return points.reduce(function(curClosest, curValue){
           var dist = curValue.sqDistanceTo(x, y);
           return (curClosest === null || curClosest.distance > dist) ? {point: curValue, distance: dist} : curClosest;
-        }, null).point;
+        }, null);
       }
 
       function applyColorToImage(imgData, width, x, y, color){
