@@ -115,10 +115,7 @@
         var imgData = this.ctx.createImageData(this.width, this.height);
         for(var y = 0; y < this.height; y++){
           for(var x = 0; x < this.width; x++){
-            var closestPoint = this.points.reduce(function(curClosest, curValue){
-              var dist = curValue.sqDistanceTo(x, y);
-              return (curClosest === null || curClosest.distance > dist) ? {point: curValue, distance: dist} : curClosest;
-            }, null).point;
+            var closestPoint = findClosestPoint(this.points, x, y);
 
             applyColorToImage(imgData, this.width, x, y, closestPoint.colorArray);
           }
@@ -126,6 +123,33 @@
         this.ctx.putImageData(imgData, 0, 0);
         this.drawPoints();
         this.isDrawn = true;
+      }
+
+      function fillAreasLines(){
+        var lineCount = 100000;
+        this.clearAll();
+        for(var i = 0; i < lineCount; i++){
+          var x = Math.floor(Math.random() * (this.width + 1));
+          var y = Math.floor(Math.random() * (this.height + 1));
+
+          var closestPoint = findClosestPoint(this.points, x, y);
+
+          this.ctx.strokeStyle = closestPoint.color;
+          this.ctx.beginPath();
+          this.ctx.moveTo(x, y);
+          this.ctx.lineTo(closestPoint.x, closestPoint.y);
+          this.ctx.stroke();
+        }
+        //window.requestAnimationFrame(fillAreasLines.bind(this));
+        this.drawPoints();
+        this.isDrawn = true;
+      }
+
+      function findClosestPoint(points, x, y){
+        return points.reduce(function(curClosest, curValue){
+          var dist = curValue.sqDistanceTo(x, y);
+          return (curClosest === null || curClosest.distance > dist) ? {point: curValue, distance: dist} : curClosest;
+        }, null).point;
       }
 
       function applyColorToImage(imgData, width, x, y, color){
@@ -140,13 +164,13 @@
         this.x = x;
         this.y = y;
         this.colorArray = randomColor();
-        //this.color = colorFromArray(this.colorArray);
+        this.color = colorFromArray(this.colorArray);
       }
 
       VorPoint.prototype = {
         x: 0,
         y: 0,
-        //color: "",
+        color: "",
         colorArray: [],
         sqDistanceTo: sqDistanceTo,
         distanceTo: distanceTo
