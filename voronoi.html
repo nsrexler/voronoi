@@ -167,7 +167,7 @@
           }
         }
         this.ctx.putImageData(imgData, 0, 0);
-        this.drawPoints();
+        if(!this.image) this.drawPoints();
         this.isDrawn = true;
       }
 
