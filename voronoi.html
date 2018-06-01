@@ -71,6 +71,12 @@
       function clearAll(){
         this.isDrawn = false;
         this.ctx.clearRect(0, 0, this.width, this.height);
+        if(this.imageBmp){
+          this.ctx.save();
+          this.ctx.globalAlpha = 0.5;
+          this.ctx.drawImage(this.imageBmp, 0, 0);
+          this.ctx.restore();
+        }
       }
 
       function getPoint(x, y){
@@ -82,12 +88,18 @@
         else return new VorPoint(x, y);
       }
 
-      function drawPoints(){
+      function drawPoints(onlyLast){
         var ctx = this.ctx;
         ctx.fillStyle = "#000000";
-        this.points.forEach(function(point){
+        if(onlyLast){
+          var point = this.points[this.points.length - 1];
           ctx.fillRect(point.x-1, point.y-1, 3, 3);
-        });
+        }
+        else{
+          this.points.forEach(function(point){
+            ctx.fillRect(point.x-1, point.y-1, 3, 3);
+          });
+        }
       }
 
       function addPoint(evt){
@@ -95,7 +107,7 @@
         var x = evt.clientX - rect.left;
         var y = evt.clientY - rect.top;
         this.points.push(this.getPoint(x, y));
-        this.isDrawn ? this.fillAreas() : this.drawPoints();
+        this.isDrawn ? this.fillAreas() : this.drawPoints(true);
       }
 
       function dropImage(evt){
@@ -125,8 +137,12 @@
 
           canv.width = hid.width;
           canv.height = hid.height;
+          canv.imageBmp = imgBmp;
           canv.image = imgData;
           canv.points = [];
+          canv.clearAll();
+
+          document.getElementById("useAvgLbl").hidden = false;
         });
         //document.getElementById("testImage").src = URL.createObjectURL(imageFile);
       }
@@ -159,12 +175,38 @@
       }
 
       function fillAreasBrute(){
+        var colorMap = {};
+        var useAvg = this.image && document.getElementById("useAvg").checked;
         var imgData = this.ctx.createImageData(this.width, this.height);
         for(var y = 0; y < this.height; y++){
           for(var x = 0; x < this.width; x++){
             var closestPoint = findClosestPoint(this.points, x, y).point;
 
-            applyColorToImage(imgData, this.width, x, y, closestPoint.colorArray);
+            if(useAvg){
+              var pxList = colorMap[closestPoint];
+              if(!pxList){
+                pxList = [];
+                colorMap[closestPoint] = pxList;
+              }
+              pxList.push({x: x, y: y});
+            }
+            else applyColorToImage(imgData, this.width, x, y, closestPoint.colorArray);
+          }
+        }
+        if(useAvg){
+          var cWidth = this.width;
+          for(var point in colorMap){
+            var pxList = colorMap[point];
+            var colorTotal = [0, 0, 0];
+            for(var i = 0; i < pxList.length; i++){
+              var px = pxList[i];
+              var idx = 4 * (px.y * this.width + px.x);
+              colorTotal[0] += this.image.data[idx];
+              colorTotal[1] += this.image.data[idx+1];
+              colorTotal[2] += this.image.data[idx+2];
+            }
+            var colorAvg = colorTotal.map(function(d){return d / pxList.length;});
+            pxList.forEach(function(px){applyColorToImage(imgData, cWidth, px.x, px.y, colorAvg);});
           }
         }
         this.ctx.putImageData(imgData, 0, 0);
@@ -220,7 +262,8 @@
         color: "",
         colorArray: [],
         sqDistanceTo: sqDistanceTo,
-        distanceTo: distanceTo
+        distanceTo: distanceTo,
+        toString: function(){return this.x.toString() + "," + this.y.toString();}
       };
 
       function randomChannel(){
@@ -256,6 +299,7 @@
       <canvas width="800" height="600" style="border: 1px solid black;"></canvas>
       <div class="controls">
         <label>Number of points: <input class="pointCount" type="number" pattern="\d*" min="0" value="100" required /></label>
+        <label id="useAvgLbl" hidden>Use average color: <input type="checkbox" id="useAvg" checked /></label>
         <br />
         <button class="genPoints">Place Points</button>
         <button class="drawBtn" disabled>Draw Diagram</button>
