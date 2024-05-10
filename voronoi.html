@@ -5,6 +5,32 @@
     <script type="text/javascript">//<![CDATA[
       "use strict";
 
+      //let fastSqDistance = (ax,ay,bx,by) => 0;
+      let wasm = null;
+
+      const memory = new WebAssembly.Memory({
+        initial: 10,
+        maximum: 100,
+      });
+
+      const points = new WebAssembly.Global({value: "i32", mutable: true}, 0);
+
+      const importObject = {
+        env: {
+          memory,
+          __memory_base: 0
+        },
+        "GOT.mem": {
+          points
+        }
+      }
+
+      WebAssembly.instantiateStreaming(fetch("data:application/wasm;base64,AGFzbQEAAAAADwhkeWxpbmsuMAEECAIAAAEUBGAAAGABfwBgA39/fwBgAn9/AX8CNgMDZW52DV9fbWVtb3J5X2Jhc2UDfwAHR09ULm1lbQZwb2ludHMDfwEDZW52Bm1lbW9yeQIAAQMFBAABAgMGBgF/AEEECwdkBhFfX3dhc21fY2FsbF9jdG9ycwAAGF9fd2FzbV9hcHBseV9kYXRhX3JlbG9jcwAACmluaXRQb2ludHMAAQhzZXRQb2ludAACBnBvaW50cwMCEGZpbmRDbG9zZXN0UG9pbnQAAwrKAgQDAAELCQAjACAANgIACxsAIwEoAgAgAEEDdGoiACACNgIEIAAgATYCAAudAgELfyMAKAIAIgJBAEwEQEF/DwsgAkEBcSEJIwEoAgAhBwJAIAJBAUYEQEEAIQJBfyEFQX8hAwwBCyACQf7///8HcSEKQQAhAkF/IQVBfyEDA0AgByACQQN0aiIEKAIEIAFrIgYgBmwgBCgCACAAayIEIARsaiIEIAMgBUF/RiADIARKciILGyIEIAcgAkEBciIMQQN0aiIDKAIEIAFrIgYgBmwgAygCACAAayIDIANsaiIGIAQgBkgbIQMgDCACIAUgCxsgBCAGShshBSACQQJqIQIgCEECaiIIIApHDQALCyAJBH8gAiACIAUgAyAHIAJBA3RqIgIoAgQgAWsiASABbCACKAIAIABrIgAgAGxqShsgBUF/RhsFIAULCwsOAQAjAAsIAAAAAAAAAAA="), importObject).then(obj => {
+        //console.log(obj)
+        //fastSqDistance = obj.instance.exports.sqDistanceTo;
+        wasm = obj.instance.exports;
+      })
+
       function initVoronoi(vor){
         vor.canvas = vor.querySelector("canvas");
         vor.canvas.ctx = vor.canvas.getContext("2d");
@@ -21,34 +47,34 @@
         });
         vor.canvas.addEventListener("drop", dropImage);
 
-        var genPoints = vor.querySelector(".genPoints");
+        const genPoints = vor.querySelector(".genPoints");
         genPoints.vor = vor;
         genPoints.addEventListener("click", generatePoints);
 
-        var drawBtn = vor.querySelector(".drawBtn");
+        const drawBtn = vor.querySelector(".drawBtn");
         drawBtn.vor = vor;
         drawBtn.addEventListener("click", drawDiagram);
 
-        var clearBtn = vor.querySelector(".clear");
+        const clearBtn = vor.querySelector(".clear");
         clearBtn.vor = vor;
         clearBtn.addEventListener("click", clearPoints);
 
-        var colorBtn = vor.querySelector(".colorChange");
+        const colorBtn = vor.querySelector(".colorChange");
         colorBtn.vor = vor;
         colorBtn.addEventListener("click", changeColors);
 
-        var downBtn = vor.querySelector(".download");
+        const downBtn = vor.querySelector(".download");
         downBtn.vor = vor;
         downBtn.addEventListener("click", downloadImage);
       }
 
       function generatePoints(evt){
-        var vor = this.vor;
+        const vor = this.vor;
 
-        var numPoints = vor.pointCount.valueAsNumber;
+        const numPoints = vor.pointCount.valueAsNumber;
 
         vor.canvas.points = new Array(numPoints);
-        for(var i = 0; i < numPoints; i++){
+        for(let i = 0; i < numPoints; i++){
           vor.canvas.points[i] = vor.canvas.getPoint(Math.floor(Math.random() * (vor.canvas.width + 1)), Math.floor(Math.random() * (vor.canvas.height + 1)));
         }
 
@@ -81,18 +107,18 @@
 
       function getPoint(x, y){
         if(this.image){
-          var i = 4 * (y * this.width + x);
-          var color = this.image.data.slice(i, i + 3);
+          const i = 4 * (y * this.width + x);
+          const color = this.image.data.slice(i, i + 3);
           return new VorPoint(x, y, color);
         }
         else return new VorPoint(x, y);
       }
 
       function drawPoints(onlyLast){
-        var ctx = this.ctx;
+        const ctx = this.ctx;
         ctx.fillStyle = "#000000";
         if(onlyLast){
-          var point = this.points[this.points.length - 1];
+          const point = this.points[this.points.length - 1];
           ctx.fillRect(point.x-1, point.y-1, 3, 3);
         }
         else{
@@ -103,17 +129,17 @@
       }
 
       function addPoint(evt){
-        var rect = this.getBoundingClientRect();
-        var x = evt.clientX - rect.left;
-        var y = evt.clientY - rect.top;
+        const rect = this.getBoundingClientRect();
+        const x = evt.clientX - rect.left;
+        const y = evt.clientY - rect.top;
         this.points.push(this.getPoint(x, y));
         this.isDrawn ? this.fillAreas() : this.drawPoints(true);
       }
 
       function dropImage(evt){
-        var imageFile = null;
-        for(var i = 0; i < evt.dataTransfer.files.length; i++){
-          var curFile = evt.dataTransfer.files[i];
+        let imageFile = null;
+        for(const i = 0; i < evt.dataTransfer.files.length; i++){
+          const curFile = evt.dataTransfer.files[i];
           if(curFile.type.startsWith("image")){
             imageFile = curFile;
             break;
@@ -125,15 +151,15 @@
         }
         else return;
 
-        var canv = this;
+        const canv = this;
 
         createImageBitmap(imageFile).then(function(imgBmp){
-          var hid = document.createElement("canvas");
+          const hid = document.createElement("canvas");
           hid.width = imgBmp.width;
           hid.height = imgBmp.height;
           hid.ctx = hid.getContext("2d");
           hid.ctx.drawImage(imgBmp, 0, 0);
-          var imgData = hid.ctx.getImageData(0, 0, hid.width, hid.height);
+          const imgData = hid.ctx.getImageData(0, 0, hid.width, hid.height);
 
           canv.width = hid.width;
           canv.height = hid.height;
@@ -165,9 +191,9 @@
       }
 
       function downloadImage(evt){
-        var data = this.vor.canvas.toBlob(function(blob){
-          var imgUrl = URL.createObjectURL(blob);
-          var imgLink = document.querySelector("a.imgLink");
+        const data = this.vor.canvas.toBlob(function(blob){
+          const imgUrl = URL.createObjectURL(blob);
+          const imgLink = document.querySelector("a.imgLink");
           imgLink.href = imgUrl;
           imgLink.download = "voronoi.png";
           imgLink.click();
@@ -175,15 +201,21 @@
       }
 
       function fillAreasBrute(){
-        var colorMap = {};
-        var useAvg = this.image && document.getElementById("useAvg").checked;
-        var imgData = this.ctx.createImageData(this.width, this.height);
-        for(var y = 0; y < this.height; y++){
-          for(var x = 0; x < this.width; x++){
-            var closestPoint = findClosestPoint(this.points, x, y).point;
+        const startTime = new Date();
+        const colorMap = {};
+        const useAvg = this.image && document.getElementById("useAvg").checked;
+        const imgData = this.ctx.createImageData(this.width, this.height);
+        wasm.initPoints(this.points.length);
+        this.points.forEach((point, i) => {
+          wasm.setPoint(i, point.x, point.y);
+        });
+        for(let y = 0; y < this.height; y++){
+          for(let x = 0; x < this.width; x++){
+            //const closestPoint = findClosestPoint(this.points, x, y).point;
+            const closestPoint = this.points[wasm.findClosestPoint(x,y)];
 
             if(useAvg){
-              var pxList = colorMap[closestPoint];
+              let pxList = colorMap[closestPoint];
               if(!pxList){
                 pxList = [];
                 colorMap[closestPoint] = pxList;
@@ -194,34 +226,52 @@
           }
         }
         if(useAvg){
-          var cWidth = this.width;
-          for(var point in colorMap){
-            var pxList = colorMap[point];
-            var colorTotal = [0, 0, 0];
-            for(var i = 0; i < pxList.length; i++){
-              var px = pxList[i];
-              var idx = 4 * (px.y * this.width + px.x);
+          const cWidth = this.width;
+          for(const point in colorMap){
+            const pxList = colorMap[point];
+            const colorTotal = [0, 0, 0];
+            for(let i = 0; i < pxList.length; i++){
+              const px = pxList[i];
+              const idx = 4 * (px.y * this.width + px.x);
               colorTotal[0] += this.image.data[idx];
               colorTotal[1] += this.image.data[idx+1];
               colorTotal[2] += this.image.data[idx+2];
             }
-            var colorAvg = colorTotal.map(function(d){return d / pxList.length;});
+            const colorAvg = colorTotal.map(function(d){return d / pxList.length;});
             pxList.forEach(function(px){applyColorToImage(imgData, cWidth, px.x, px.y, colorAvg);});
           }
         }
         this.ctx.putImageData(imgData, 0, 0);
+        // for(let i = 0; i < this.points.length; i++){
+        //   const point = this.points[i];
+        //   let closestDist = -1;
+        //   for(let j = 0; j < this.points.length; j++) {
+        //     if(j === i) continue;
+        //     const other = this.points[j];
+        //     const dist = point.distanceTo(other.x, other.y);
+        //     if(closestDist === -1 || closestDist > dist) {
+        //       closestDist = dist;
+        //     }
+        //   }
+        //   this.ctx.strokeStyle = "black";
+        //   this.ctx.beginPath();
+        //   this.ctx.arc(point.x, point.y, closestDist / 2.0, 0, 2 * Math.PI);
+        //   this.ctx.stroke();
+        // }
         if(!this.image) this.drawPoints();
         this.isDrawn = true;
+        const elapsed = (new Date()) - startTime;
+        console.log(`${elapsed / 1000}s`)
       }
 
       function fillAreasLines(){
-        var lineCount = 100000;
+        const lineCount = 100000;
         this.clearAll();
-        for(var i = 0; i < lineCount; i++){
-          var x = Math.floor(Math.random() * (this.width + 1));
-          var y = Math.floor(Math.random() * (this.height + 1));
+        for(let i = 0; i < lineCount; i++){
+          const x = Math.floor(Math.random() * (this.width + 1));
+          const y = Math.floor(Math.random() * (this.height + 1));
 
-          var closestPoint = findClosestPoint(this.points, x, y).point;
+          const closestPoint = findClosestPoint(this.points, x, y).point;
 
           this.ctx.strokeStyle = closestPoint.color;
           this.ctx.beginPath();
@@ -236,13 +286,13 @@
 
       function findClosestPoint(points, x, y){
         return points.reduce(function(curClosest, curValue){
-          var dist = curValue.sqDistanceTo(x, y);
+          const dist = curValue.sqDistanceTo(x, y);
           return (curClosest === null || curClosest.distance > dist) ? {point: curValue, distance: dist} : curClosest;
         }, null);
       }
 
       function applyColorToImage(imgData, width, x, y, color){
-        var i = 4 * (y * width + x);
+        const i = 4 * (y * width + x);
         imgData.data[i] = color[0];
         imgData.data[i+1] = color[1];
         imgData.data[i+2] = color[2];
@@ -261,9 +311,16 @@
         y: 0,
         color: "",
         colorArray: [],
-        sqDistanceTo: sqDistanceTo,
-        distanceTo: distanceTo,
-        toString: function(){return this.x.toString() + "," + this.y.toString();}
+        sqDistanceTo(x, y) {
+          const a = this.x - x;
+          const b = this.y - y;
+          return a*a + b*b; // Euclidean
+          //return Math.abs(a) + Math.abs(b); // Manhattan
+        },
+        distanceTo(x, y) {
+          return Math.sqrt(this.sqDistanceTo(x, y));
+        },
+        toString(){return `${this.x},${this.y}`;}
       };
 
       function randomChannel(){
@@ -276,17 +333,6 @@
 
       function colorFromArray(array){
         return "rgb(" + array.join(",") + ")";
-      }
-
-      function sqDistanceTo(x, y){
-        var a = this.x - x;
-        var b = this.y - y;
-        return a*a + b*b; // Euclidean
-        //return Math.abs(a) + Math.abs(b); // Manhattan
-      }
-
-      function distanceTo(x, y){
-        return Math.sqrt(this.sqDistanceTo(x, y));
       }
 
       window.addEventListener("load", function(){
