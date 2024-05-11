@@ -330,12 +330,6 @@
         y: 0,
         color: "",
         colorArray: [],
-        sqDistanceTo(x, y) {
-          return sqDistanceTo(this.x, this.x, x, y);
-        },
-        distanceTo(x, y) {
-          return Math.sqrt(this.sqDistanceTo(x, y));
-        },
         toString(){return `${this.x},${this.y}`;}
       };
 
@@ -344,6 +338,10 @@
         const d = ay - by;
         return c*c + d*d; // Euclidean
         //return Math.abs(c) + Math.abs(d); // Manhattan
+      }
+
+      function distanceTo(ax, ay, bx, by) {
+        return Math.sqrt(sqDistanceTo(ax, ay, bx, by));
       }
 
       function randomChannel(){
