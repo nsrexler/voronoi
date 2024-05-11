@@ -5,32 +5,6 @@
     <script type="text/javascript">//<![CDATA[
       "use strict";
 
-      //let fastSqDistance = (ax,ay,bx,by) => 0;
-      let wasm = null;
-
-      const memory = new WebAssembly.Memory({
-        initial: 10,
-        maximum: 100,
-      });
-
-      const points = new WebAssembly.Global({value: "i32", mutable: true}, 0);
-
-      const importObject = {
-        env: {
-          memory,
-          __memory_base: 0
-        },
-        "GOT.mem": {
-          points
-        }
-      }
-
-      WebAssembly.instantiateStreaming(fetch("data:application/wasm;base64,AGFzbQEAAAAADwhkeWxpbmsuMAEECAIAAAEUBGAAAGABfwBgA39/fwBgAn9/AX8CNgMDZW52DV9fbWVtb3J5X2Jhc2UDfwAHR09ULm1lbQZwb2ludHMDfwEDZW52Bm1lbW9yeQIAAQMFBAABAgMGBgF/AEEECwdkBhFfX3dhc21fY2FsbF9jdG9ycwAAGF9fd2FzbV9hcHBseV9kYXRhX3JlbG9jcwAACmluaXRQb2ludHMAAQhzZXRQb2ludAACBnBvaW50cwMCEGZpbmRDbG9zZXN0UG9pbnQAAwrKAgQDAAELCQAjACAANgIACxsAIwEoAgAgAEEDdGoiACACNgIEIAAgATYCAAudAgELfyMAKAIAIgJBAEwEQEF/DwsgAkEBcSEJIwEoAgAhBwJAIAJBAUYEQEEAIQJBfyEFQX8hAwwBCyACQf7///8HcSEKQQAhAkF/IQVBfyEDA0AgByACQQN0aiIEKAIEIAFrIgYgBmwgBCgCACAAayIEIARsaiIEIAMgBUF/RiADIARKciILGyIEIAcgAkEBciIMQQN0aiIDKAIEIAFrIgYgBmwgAygCACAAayIDIANsaiIGIAQgBkgbIQMgDCACIAUgCxsgBCAGShshBSACQQJqIQIgCEECaiIIIApHDQALCyAJBH8gAiACIAUgAyAHIAJBA3RqIgIoAgQgAWsiASABbCACKAIAIABrIgAgAGxqShsgBUF/RhsFIAULCwsOAQAjAAsIAAAAAAAAAAA="), importObject).then(obj => {
-        //console.log(obj)
-        //fastSqDistance = obj.instance.exports.sqDistanceTo;
-        wasm = obj.instance.exports;
-      })
-
       function initVoronoi(vor){
         vor.canvas = vor.querySelector("canvas");
         vor.canvas.ctx = vor.canvas.getContext("2d");
@@ -39,7 +13,7 @@
         vor.canvas.getPoint = getPoint;
         vor.canvas.clearAll = clearAll;
         vor.canvas.drawPoints = drawPoints;
-        vor.canvas.fillAreas = fillAreasBrute;
+        vor.canvas.fillAreas = fillAreasParallel;
         vor.pointCount = vor.querySelector(".pointCount");
         vor.canvas.addEventListener("click", addPoint);
         vor.canvas.addEventListener("dragover", function(evt){
@@ -205,14 +179,9 @@
         const colorMap = {};
         const useAvg = this.image && document.getElementById("useAvg").checked;
         const imgData = this.ctx.createImageData(this.width, this.height);
-        wasm.initPoints(this.points.length);
-        this.points.forEach((point, i) => {
-          wasm.setPoint(i, point.x, point.y);
-        });
         for(let y = 0; y < this.height; y++){
           for(let x = 0; x < this.width; x++){
-            //const closestPoint = findClosestPoint(this.points, x, y).point;
-            const closestPoint = this.points[wasm.findClosestPoint(x,y)];
+            const closestPoint = findClosestPoint(this.points, x, y);
 
             if(useAvg){
               let pxList = colorMap[closestPoint];
@@ -242,26 +211,69 @@
           }
         }
         this.ctx.putImageData(imgData, 0, 0);
-        // for(let i = 0; i < this.points.length; i++){
-        //   const point = this.points[i];
-        //   let closestDist = -1;
-        //   for(let j = 0; j < this.points.length; j++) {
-        //     if(j === i) continue;
-        //     const other = this.points[j];
-        //     const dist = point.distanceTo(other.x, other.y);
-        //     if(closestDist === -1 || closestDist > dist) {
-        //       closestDist = dist;
-        //     }
-        //   }
-        //   this.ctx.strokeStyle = "black";
-        //   this.ctx.beginPath();
-        //   this.ctx.arc(point.x, point.y, closestDist / 2.0, 0, 2 * Math.PI);
-        //   this.ctx.stroke();
-        // }
         if(!this.image) this.drawPoints();
         this.isDrawn = true;
         const elapsed = (new Date()) - startTime;
-        console.log(`${elapsed / 1000}s`)
+        console.log(`${elapsed / 1000}s`);
+      }
+
+      const fnsToInclude = [workerFn, findClosestPoint, sqDistanceTo];
+      const workerParams = workerFn.toString().match(/\(([^\)]+)\)/)[1];
+      const workers = [];
+      console.log(`${navigator.hardwareConcurrency} workers available`)
+      for(let i = 0; i < navigator.hardwareConcurrency; i++) {
+        let workerScript = fnsToInclude.map(fn => fn.toString()).join('\n') + '\n';
+        workerScript += `onmessage = (e) => {
+          const {${workerParams}} = e.data[0];
+          const result = workerFn(${workerParams});
+          postMessage([result]);}`;
+        const blob = new Blob([workerScript], {type: 'application/javascript'});
+        const worker = new Worker(URL.createObjectURL(blob));
+        worker.runAsync = function(data) {
+          this.postMessage([data]);
+          return new Promise((resolve, reject) => {
+            this.onmessage = (e) => {
+              resolve(e.data[0]);
+            }
+          })
+        }
+        workers.push(worker);
+      }
+
+      function workerFn(start, end, width, points) {
+        const colorData = [];
+        for(let y = start; y < end; y++){
+          const colorRow = [];
+          for(let x = 0; x < width; x++){
+            const closestPoint = findClosestPoint(points, x, y);
+            colorRow.push(closestPoint.colorArray);
+          }
+          colorData.push(colorRow);
+        }
+        return colorData;
+      }
+
+      async function fillAreasParallel() {
+        const startTime = new Date();
+        const imgData = this.ctx.createImageData(this.width, this.height);
+        const chunkSize = Math.ceil(this.height / workers.length);
+        await Promise.all(workers.map((worker, i) => {
+          const start = i * chunkSize;
+          const end = Math.min(start + chunkSize, this.height);
+          return worker.runAsync({start, end, width: this.width, points: this.points})
+            .then(colorData => {
+              for(let y = 0; y < colorData.length; y++) {
+                for(let x = 0; x < this.width; x++) {
+                  applyColorToImage(imgData, this.width, x, y + start, colorData[y][x]);
+                }
+              }
+            });
+        }));
+        this.ctx.putImageData(imgData, 0, 0);
+        if(!this.image) this.drawPoints();
+        this.isDrawn = true;
+        const elapsed = (new Date()) - startTime;
+        console.log(`${elapsed / 1000}s`);
       }
 
       function fillAreasLines(){
@@ -285,10 +297,17 @@
       }
 
       function findClosestPoint(points, x, y){
-        return points.reduce(function(curClosest, curValue){
-          const dist = curValue.sqDistanceTo(x, y);
-          return (curClosest === null || curClosest.distance > dist) ? {point: curValue, distance: dist} : curClosest;
-        }, null);
+        let closestPoint = null;
+        let closestDist = -1;
+        for(let i = 0; i < points.length; i++) {
+          const cur = points[i];
+          const dist = sqDistanceTo(cur.x, cur.y, x, y);
+          if(closestDist === -1 || closestDist > dist) {
+            closestPoint = cur;
+            closestDist = dist;
+          }
+        }
+        return closestPoint;
       }
 
       function applyColorToImage(imgData, width, x, y, color){
@@ -312,16 +331,20 @@
         color: "",
         colorArray: [],
         sqDistanceTo(x, y) {
-          const a = this.x - x;
-          const b = this.y - y;
-          return a*a + b*b; // Euclidean
-          //return Math.abs(a) + Math.abs(b); // Manhattan
+          return sqDistanceTo(this.x, this.x, x, y);
         },
         distanceTo(x, y) {
           return Math.sqrt(this.sqDistanceTo(x, y));
         },
         toString(){return `${this.x},${this.y}`;}
       };
+
+      function sqDistanceTo(ax, ay, bx, by) {
+        const c = ax - bx;
+        const d = ay - by;
+        return c*c + d*d; // Euclidean
+        //return Math.abs(c) + Math.abs(d); // Manhattan
+      }
 
       function randomChannel(){
         return Math.floor(Math.random() * 0x100);
