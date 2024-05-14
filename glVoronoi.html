@@ -185,16 +185,12 @@
                 float closestDistance;
                 vec3 color;
                 for(int i = 0; i < ${this.points.length}; i++) {
-                    //vec2 diff = gl_FragCoord.xy - points[i];
-                    //float distance = dot(diff, diff);
-                    float c = gl_FragCoord.x - points[i].x;
-                    float d = gl_FragCoord.y - points[i].y;
-                    float distance = (c * c) + (d * d);
+                    float distance = distance(points[i], gl_FragCoord.xy);
                     if(closestPoint == -1 || closestDistance > distance) {
                         closestPoint = i;
                         closestDistance = distance;
                         color = colors[i];
-                        if(distance <= 1.0) {
+                        if(distance <= 2.0) {
                             color = vec3(0.0, 0.0, 0.0);
                         }
                     }
@@ -339,23 +335,6 @@
                 offset,
             );
             gl.enableVertexAttribArray(programInfo.attribLocations.vertexPosition);
-        }
-
-        function fillAreasBrute() {
-            const startTime = new Date();
-            const imgData = this.ctx.createImageData(this.width, this.height);
-            for (let y = 0; y < this.height; y++) {
-                for (let x = 0; x < this.width; x++) {
-                    const closestPoint = findClosestPoint(this.points, x, y);
-
-                    applyColorToImage(imgData, this.width, x, y, closestPoint.colorArray);
-                }
-            }
-            this.ctx.putImageData(imgData, 0, 0);
-            if (!this.image) this.drawPoints();
-            this.isDrawn = true;
-            const elapsed = (new Date()) - startTime;
-            console.log(`${elapsed / 1000}s`);
         }
 
         function VorPoint(x, y, color) {
