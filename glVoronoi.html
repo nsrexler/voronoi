@@ -1,0 +1,407 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>Voronoi Generator</title>
+    <script type="text/javascript">//<![CDATA[
+        "use strict";
+
+        function initVoronoi(vor) {
+            vor.canvas = vor.querySelector("canvas");
+            vor.canvas.gl = vor.canvas.getContext("webgl");
+            vor.canvas.points = [];
+            vor.canvas.isDrawn = false;
+            vor.canvas.getPoint = getPoint;
+            vor.canvas.clearAll = clearAll;
+            vor.canvas.drawPoints = drawPoints;
+            vor.canvas.fillAreas = fillAreasGl;
+            vor.pointCount = vor.querySelector(".pointCount");
+            vor.canvas.addEventListener("click", addPoint);
+            vor.canvas.addEventListener("dragover", function (evt) {
+                evt.preventDefault();
+            });
+            //vor.canvas.addEventListener("drop", dropImage);
+
+            const genPoints = vor.querySelector(".genPoints");
+            genPoints.vor = vor;
+            genPoints.addEventListener("click", generatePoints);
+
+            const drawBtn = vor.querySelector(".drawBtn");
+            drawBtn.vor = vor;
+            drawBtn.addEventListener("click", drawDiagram);
+
+            const clearBtn = vor.querySelector(".clear");
+            clearBtn.vor = vor;
+            clearBtn.addEventListener("click", clearPoints);
+
+            const colorBtn = vor.querySelector(".colorChange");
+            colorBtn.vor = vor;
+            colorBtn.addEventListener("click", changeColors);
+
+            const downBtn = vor.querySelector(".download");
+            downBtn.vor = vor;
+            downBtn.addEventListener("click", downloadImage);
+        }
+
+        function generatePoints(evt) {
+            const vor = this.vor;
+
+            const numPoints = vor.pointCount.valueAsNumber;
+
+            vor.canvas.points = new Array(numPoints);
+            for (let i = 0; i < numPoints; i++) {
+                vor.canvas.points[i] = vor.canvas.getPoint(Math.floor(Math.random() * (vor.canvas.width + 1)), Math.floor(Math.random() * (vor.canvas.height + 1)));
+            }
+
+            /*var pointSpacing = 20;
+            var isOdd = false;
+            for(var y = pointSpacing / 2; y < vor.canvas.height; y += pointSpacing){
+              isOdd = !isOdd;
+              for(var x = isOdd ? pointSpacing : pointSpacing / 2; x < vor.canvas.width; x += pointSpacing){
+                vor.canvas.points.push(new VorPoint(x, y));
+              }
+            }*/
+
+            vor.canvas.clearAll();
+            vor.canvas.drawPoints();
+
+            vor.querySelector(".drawBtn").disabled = false;
+            vor.querySelector(".colorChange").disabled = true;
+        }
+
+        function clearAll() {
+            const gl = this.gl;
+
+            // Set clear color to black, fully opaque
+            gl.clearColor(1.0, 1.0, 1.0, 1.0);
+            // Clear the color buffer with specified clear color
+            gl.clear(gl.COLOR_BUFFER_BIT);
+        }
+
+        function getPoint(x, y) {
+            if (this.image) {
+                const i = 4 * (y * this.width + x);
+                const color = this.image.data.slice(i, i + 3);
+                return new VorPoint(x, y, color);
+            }
+            else return new VorPoint(x, y);
+        }
+
+        function drawPoints(onlyLast) {
+            // const ctx = this.ctx;
+            // ctx.fillStyle = "#000000";
+            // if(onlyLast){
+            //   const point = this.points[this.points.length - 1];
+            //   ctx.fillRect(point.x-1, point.y-1, 3, 3);
+            // }
+            // else{
+            //   this.points.forEach(function(point){
+            //     ctx.fillRect(point.x-1, point.y-1, 3, 3);
+            //   });
+            // }
+        }
+
+        function addPoint(evt) {
+            const rect = this.getBoundingClientRect();
+            const x = evt.clientX - rect.left;
+            const y = evt.clientY - rect.top;
+            this.points.push(this.getPoint(x, y));
+            this.isDrawn ? this.fillAreas() : this.drawPoints(true);
+        }
+
+        //   function dropImage(evt){
+        //     let imageFile = null;
+        //     for(const i = 0; i < evt.dataTransfer.files.length; i++){
+        //       const curFile = evt.dataTransfer.files[i];
+        //       if(curFile.type.startsWith("image")){
+        //         imageFile = curFile;
+        //         break;
+        //       }
+        //     }
+
+        //     if(imageFile){
+        //       evt.preventDefault();
+        //     }
+        //     else return;
+
+        //     const canv = this;
+
+        //     createImageBitmap(imageFile).then(function(imgBmp){
+        //       const hid = document.createElement("canvas");
+        //       hid.width = imgBmp.width;
+        //       hid.height = imgBmp.height;
+        //       hid.ctx = hid.getContext("2d");
+        //       hid.ctx.drawImage(imgBmp, 0, 0);
+        //       const imgData = hid.ctx.getImageData(0, 0, hid.width, hid.height);
+
+        //       canv.width = hid.width;
+        //       canv.height = hid.height;
+        //       canv.imageBmp = imgBmp;
+        //       canv.image = imgData;
+        //       canv.points = [];
+        //       canv.clearAll();
+
+        //       document.getElementById("useAvgLbl").hidden = false;
+        //     });
+        //     //document.getElementById("testImage").src = URL.createObjectURL(imageFile);
+        //   }
+
+        function drawDiagram(evt) {
+            this.vor.canvas.fillAreas();
+            this.vor.querySelector(".colorChange").disabled = false;
+        }
+
+        function clearPoints(evt) {
+            this.vor.canvas.points = [];
+            this.vor.canvas.clearAll();
+            vor.querySelector(".drawBtn").disabled = true;
+            vor.querySelector(".colorChange").disabled = true;
+        }
+
+        function changeColors(evt) {
+            this.vor.canvas.points.forEach(function (point) { point.colorArray = randomColor(); });
+            this.vor.canvas.fillAreas();
+        }
+
+        function downloadImage(evt) {
+            const data = this.vor.canvas.toBlob(function (blob) {
+                const imgUrl = URL.createObjectURL(blob);
+                const imgLink = document.querySelector("a.imgLink");
+                imgLink.href = imgUrl;
+                imgLink.download = "voronoi.png";
+                imgLink.click();
+            });
+        }
+
+        function fillAreasGl() {
+            const gl = this.gl;
+
+            const fsSource = `
+            precision mediump float;
+            uniform vec2 points[${this.points.length}];
+            uniform vec3 colors[${this.points.length}];
+            void main() {
+                int closestPoint = -1;
+                float closestDistance;
+                vec3 color;
+                for(int i = 0; i < ${this.points.length}; i++) {
+                    //vec2 diff = gl_FragCoord.xy - points[i];
+                    //float distance = dot(diff, diff);
+                    float c = gl_FragCoord.x - points[i].x;
+                    float d = gl_FragCoord.y - points[i].y;
+                    float distance = (c * c) + (d * d);
+                    if(closestPoint == -1 || closestDistance > distance) {
+                        closestPoint = i;
+                        closestDistance = distance;
+                        color = colors[i];
+                        if(distance <= 1.0) {
+                            color = vec3(0.0, 0.0, 0.0);
+                        }
+                    }
+                }
+
+                gl_FragColor = vec4(color.x, color.y, color.z, 1.0);
+            }
+            `;
+
+            const shaderProgram = initShaderProgram(gl, fsSource);
+            const programInfo = {
+                program: shaderProgram,
+                attribLocations: {
+                    vertexPosition: gl.getAttribLocation(shaderProgram, "aVertexPosition"),
+                },
+            };
+
+            const buffers = initBuffers(gl);
+
+            setPositionAttribute(gl, buffers, programInfo);
+
+            gl.useProgram(shaderProgram);
+
+            gl.uniform2fv(
+                gl.getUniformLocation(shaderProgram, "points"),
+                new Float32Array(this.points.flatMap(point => [point.x, this.height - point.y]))
+            );
+
+            gl.uniform3fv(
+                gl.getUniformLocation(shaderProgram, "colors"),
+                new Float32Array(this.points.flatMap(point => point.colorArray))
+            );
+
+            const offset = 0;
+            const vertexCount = 4;
+            gl.drawArrays(gl.TRIANGLE_STRIP, offset, vertexCount);
+
+            this.isDrawn = true;
+        }
+
+        //
+        // Initialize a shader program, so WebGL knows how to draw our data
+        //
+        function initShaderProgram(gl, fsSource) {
+            const vsSource = `
+    attribute vec4 aVertexPosition;
+    void main() {
+      gl_Position = aVertexPosition;
+    }
+  `;
+
+            const vertexShader = loadShader(gl, gl.VERTEX_SHADER, vsSource);
+            const fragmentShader = loadShader(gl, gl.FRAGMENT_SHADER, fsSource);
+
+            // Create the shader program
+
+            const shaderProgram = gl.createProgram();
+            gl.attachShader(shaderProgram, vertexShader);
+            gl.attachShader(shaderProgram, fragmentShader);
+            gl.linkProgram(shaderProgram);
+
+            // If creating the shader program failed, alert
+
+            if (!gl.getProgramParameter(shaderProgram, gl.LINK_STATUS)) {
+                alert(
+                    `Unable to initialize the shader program: ${gl.getProgramInfoLog(
+                        shaderProgram,
+                    )}`,
+                );
+                return null;
+            }
+
+            return shaderProgram;
+        }
+
+        //
+        // creates a shader of the given type, uploads the source and
+        // compiles it.
+        //
+        function loadShader(gl, type, source) {
+            const shader = gl.createShader(type);
+
+            // Send the source to the shader object
+            gl.shaderSource(shader, source);
+
+            // Compile the shader program
+            gl.compileShader(shader);
+
+            // See if it compiled successfully
+            if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
+                alert(
+                    `An error occurred compiling the shaders: ${gl.getShaderInfoLog(shader)}`,
+                );
+                gl.deleteShader(shader);
+                return null;
+            }
+
+            return shader;
+        }
+
+        function initBuffers(gl) {
+            const positionBuffer = initPositionBuffer(gl);
+
+            return {
+                position: positionBuffer,
+            };
+        }
+
+        function initPositionBuffer(gl) {
+            // Create a buffer for the square's positions.
+            const positionBuffer = gl.createBuffer();
+
+            // Select the positionBuffer as the one to apply buffer
+            // operations to from here out.
+            gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
+
+            // Now create an array of positions for the square.
+            const positions = [1.0, 1.0, -1.0, 1.0, 1.0, -1.0, -1.0, -1.0];
+
+            // Now pass the list of positions into WebGL to build the
+            // shape. We do this by creating a Float32Array from the
+            // JavaScript array, then use it to fill the current buffer.
+            gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(positions), gl.STATIC_DRAW);
+
+            return positionBuffer;
+        }
+
+        function setPositionAttribute(gl, buffers, programInfo) {
+            const numComponents = 2; // pull out 2 values per iteration
+            const type = gl.FLOAT; // the data in the buffer is 32bit floats
+            const normalize = false; // don't normalize
+            const stride = 0; // how many bytes to get from one set of values to the next
+            // 0 = use type and numComponents above
+            const offset = 0; // how many bytes inside the buffer to start from
+            gl.bindBuffer(gl.ARRAY_BUFFER, buffers.position);
+            gl.vertexAttribPointer(
+                programInfo.attribLocations.vertexPosition,
+                numComponents,
+                type,
+                normalize,
+                stride,
+                offset,
+            );
+            gl.enableVertexAttribArray(programInfo.attribLocations.vertexPosition);
+        }
+
+        function fillAreasBrute() {
+            const startTime = new Date();
+            const imgData = this.ctx.createImageData(this.width, this.height);
+            for (let y = 0; y < this.height; y++) {
+                for (let x = 0; x < this.width; x++) {
+                    const closestPoint = findClosestPoint(this.points, x, y);
+
+                    applyColorToImage(imgData, this.width, x, y, closestPoint.colorArray);
+                }
+            }
+            this.ctx.putImageData(imgData, 0, 0);
+            if (!this.image) this.drawPoints();
+            this.isDrawn = true;
+            const elapsed = (new Date()) - startTime;
+            console.log(`${elapsed / 1000}s`);
+        }
+
+        function VorPoint(x, y, color) {
+            this.x = x;
+            this.y = y;
+            this.colorArray = color || randomColor();
+        }
+
+        VorPoint.prototype = {
+            x: 0,
+            y: 0,
+            colorArray: [],
+            toString() { return `${this.x},${this.y}`; }
+        };
+
+        function randomChannel() {
+            return Math.random();
+        }
+
+        function randomColor() {
+            return [randomChannel(), randomChannel(), randomChannel()];
+        }
+
+        window.addEventListener("load", function () {
+            document.querySelectorAll(".voronoi").forEach(initVoronoi);
+        })
+        //]]></script>
+</head>
+
+<body>
+    <div class="voronoi">
+        <canvas width="800" height="600" style="border: 1px solid black;"></canvas>
+        <div class="controls">
+            <label>Number of points: <input class="pointCount" type="number" pattern="\d*" min="0" value="100"
+                    required /></label>
+            <label id="useAvgLbl" hidden>Use average color: <input type="checkbox" id="useAvg" checked /></label>
+            <br />
+            <button class="genPoints">Place Points</button>
+            <button class="drawBtn" disabled>Draw Diagram</button>
+            <button class="clear">Clear</button>
+            <button class="colorChange" disabled>Change Colors</button>
+            <button class="download">Download Image</button>
+            <a class="imgLink" style="display: none">image download</a>
+        </div>
+        <!--<img id="testImage" />-->
+    </div>
+</body>
+
+</html>
