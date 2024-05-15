@@ -242,7 +242,6 @@
 
             const textureWidth = 100;
             const textureData = new Uint8Array([...this.points.flatMap(point => [...point.colorArray.map(f => Math.floor(f * 0x100)), 0xFF]), ...(new Array(4 * (textureWidth - (this.points.length % textureWidth)))).fill(0xFF)]);
-            console.log(textureData);
             const textureHeight = Math.ceil(textureData.length / (4.0 * textureWidth));
 
             
