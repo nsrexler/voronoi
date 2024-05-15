@@ -81,9 +81,11 @@
         }
 
         function clearAll() {
+            this.isDrawn = false;
+
             const gl = this.gl;
 
-            // Set clear color to black, fully opaque
+            // Set clear color to white, fully opaque
             gl.clearColor(1.0, 1.0, 1.0, 1.0);
             // Clear the color buffer with specified clear color
             gl.clear(gl.COLOR_BUFFER_BIT);
@@ -104,10 +106,11 @@
             const fsSource = `
             precision mediump float;
             //uniform vec2 resolution;
-            uniform vec2 points[${this.points.length}];
+            const int pointCount = ${this.points.length};
+            uniform vec2 points[pointCount];
 
             void main() {
-                for(int i = 0; i < ${this.points.length}; i++) {
+                for(int i = 0; i < pointCount; i++) {
                     float distance = distance(points[i], gl_FragCoord.xy);
                     if(distance <= 2.0) {
                         gl_FragColor = vec4(0.0, 0.0, 0.0, 1.0);
@@ -209,7 +212,8 @@
             const fsSource = `
             precision mediump float;
             //uniform vec2 resolution;
-            uniform vec2 points[${this.points.length}];
+            const int pointCount = ${this.points.length};
+            uniform vec2 points[pointCount];
             uniform sampler2D u_texture;
             const float textureWidth = 100.0;
             uniform float textureHeight;
@@ -232,7 +236,7 @@
                 int closestPoint = -1;
                 float closestDistance;
                 vec4 color;
-                for(int i = 0; i < ${this.points.length}; i++) {
+                for(int i = 0; i < pointCount; i++) {
                     float distance = distance(points[i], gl_FragCoord.xy);
                     if(closestPoint == -1 || closestDistance > distance) {
                         closestPoint = i;
