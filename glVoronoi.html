@@ -7,6 +7,8 @@
 
         function initVoronoi(vor) {
             vor.canvas = vor.querySelector("canvas");
+            resizeCanvas(vor.canvas);
+
             vor.canvas.gl = vor.canvas.getContext("webgl");
             vor.canvas.points = [];
             vor.canvas.isDrawn = false;
@@ -40,6 +42,15 @@
             const downBtn = vor.querySelector(".download");
             downBtn.vor = vor;
             downBtn.addEventListener("click", downloadImage);
+        }
+
+        function resizeCanvas(canvas) {
+            if (window.devicePixelRatio !== 1) {
+                canvas.style.width = canvas.width + "px";
+                canvas.style.height = canvas.height + "px";
+                canvas.width *= window.devicePixelRatio;
+                canvas.height *= window.devicePixelRatio;
+            }
         }
 
         function generatePoints(evt) {
@@ -104,7 +115,7 @@
             const rect = this.getBoundingClientRect();
             const x = evt.clientX - rect.left;
             const y = evt.clientY - rect.top;
-            this.points.push(this.getPoint(x, y));
+            this.points.push(this.getPoint(x * window.devicePixelRatio, y * window.devicePixelRatio));
             this.isDrawn ? this.fillAreas() : this.drawPoints(true);
         }
 
@@ -133,6 +144,10 @@
 
                 this.width = hid.width;
                 this.height = hid.height;
+                if (window.devicePixelRatio !== 1) {
+                    this.style.width = (this.width / window.devicePixelRatio) + "px";
+                    this.style.height = (this.height / window.devicePixelRatio) + "px";
+                }
                 this.gl.viewport(0, 0, this.width, this.height);
                 this.imageBmp = imgBmp;
                 this.image = imgData;
