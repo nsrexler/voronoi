@@ -6,11 +6,13 @@
     <script type="text/javascript">//<![CDATA[
         "use strict";
 
+        const textureWidth = 100;
+
         function initVoronoi(vor) {
             vor.canvas = vor.querySelector("canvas");
             resizeCanvas(vor.canvas);
 
-            vor.canvas.gl = vor.canvas.getContext("webgl");
+            vor.canvas.gl = vor.canvas.getContext("webgl2");
             vor.canvas.points = [];
             vor.canvas.isDrawn = false;
             vor.canvas.getPoint = getPoint;
@@ -105,13 +107,24 @@
 
             const fsSource = `
             precision mediump float;
-            //uniform vec2 resolution;
+            uniform vec2 resolution;
             const int pointCount = ${this.points.length};
-            uniform vec2 points[pointCount];
+            const float textureWidth = 100.0;
+            uniform sampler2D u_pointTexture;
+            uniform float pointTextureHeight;
+
+            vec2 getPoint(float index) {
+                float column = mod(index, textureWidth);
+                float row    = floor(index / textureWidth);
+                vec2 uv = vec2(
+                    (column + 0.5) / textureWidth,
+                    (row    + 0.5) / pointTextureHeight);
+                return texture2D(u_pointTexture, uv).xy * resolution;
+            }
 
             void main() {
                 for(int i = 0; i < pointCount; i++) {
-                    float distance = distance(points[i], gl_FragCoord.xy);
+                    float distance = distance(getPoint(float(i)), gl_FragCoord.xy);
                     if(distance <= 2.0) {
                         gl_FragColor = vec4(0.0, 0.0, 0.0, 1.0);
                     }
@@ -120,12 +133,23 @@
             `;
 
             draw2DShader(gl, fsSource, (shaderProgram) => {
-                //gl.uniform2f(gl.getUniformLocation(shaderProgram, "resolution"), this.width, this.height);
+                gl.uniform2f(gl.getUniformLocation(shaderProgram, "resolution"), this.width, this.height);
 
-                gl.uniform2fv(
-                    gl.getUniformLocation(shaderProgram, "points"),
-                    new Float32Array(this.points.flatMap(point => [point.x, this.height - point.y]))
-                );
+                const pointData = new Float32Array([...this.points.flatMap(p => [p.x / this.width, (this.height - p.y) / this.height]), ...(new Array(2 * (textureWidth - (this.points.length % textureWidth)))).fill([0,0])]);
+                const pointHeight = Math.ceil(pointData.length / (2.0 * textureWidth));
+
+                const pointTexture = gl.createTexture();
+                gl.bindTexture(gl.TEXTURE_2D, pointTexture);
+                gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+                gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+                gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+                gl.texImage2D(gl.TEXTURE_2D, 0, gl.RG16F, textureWidth, pointHeight, 0, gl.RG, gl.FLOAT, pointData);
+                gl.uniform1f(gl.getUniformLocation(shaderProgram, "pointTextureHeight"), pointHeight);
+
+                gl.uniform1i(gl.getUniformLocation(shaderProgram, "u_pointTexture"), 0);  // texture unit 0
+
+                gl.activeTexture(gl.TEXTURE0);
+                gl.bindTexture(gl.TEXTURE_2D, pointTexture);
             });
         }
 
@@ -211,25 +235,30 @@
 
             const fsSource = `
             precision mediump float;
-            //uniform vec2 resolution;
+            uniform vec2 resolution;
             const int pointCount = ${this.points.length};
-            uniform vec2 points[pointCount];
-            uniform sampler2D u_texture;
             const float textureWidth = 100.0;
-            uniform float textureHeight;
+            uniform sampler2D u_pointTexture;
+            uniform float pointTextureHeight;
+            uniform sampler2D u_colorTexture;
+            uniform float colorTextureHeight;
 
-            vec4 getValueFromTexture(float index) {
+            vec2 getPoint(float index) {
                 float column = mod(index, textureWidth);
                 float row    = floor(index / textureWidth);
                 vec2 uv = vec2(
                     (column + 0.5) / textureWidth,
-                    (row    + 0.5) / textureHeight);
-                return texture2D(u_texture, uv);
+                    (row    + 0.5) / pointTextureHeight);
+                return texture2D(u_pointTexture, uv).xy * resolution;
             }
 
-            vec4 getColor(int index) {
-                float f_index = float(index);
-                return getValueFromTexture(f_index);
+            vec4 getColor(float index) {
+                float column = mod(index, textureWidth);
+                float row    = floor(index / textureWidth);
+                vec2 uv = vec2(
+                    (column + 0.5) / textureWidth,
+                    (row    + 0.5) / colorTextureHeight);
+                return texture2D(u_colorTexture, uv);
             }
 
             void main() {
@@ -237,11 +266,11 @@
                 float closestDistance;
                 vec4 color;
                 for(int i = 0; i < pointCount; i++) {
-                    float distance = distance(points[i], gl_FragCoord.xy);
+                    float distance = distance(getPoint(float(i)), gl_FragCoord.xy);
                     if(closestPoint == -1 || closestDistance > distance) {
                         closestPoint = i;
                         closestDistance = distance;
-                        color = getColor(i);
+                        color = getColor(float(i));
                         if(distance <= 2.0) {
                             color = vec4(0.0, 0.0, 0.0, 1.0);
                         }
@@ -253,24 +282,38 @@
             `;
 
             draw2DShader(gl, fsSource, (shaderProgram) => {
-                //gl.uniform2f(gl.getUniformLocation(shaderProgram, "resolution"), this.width, this.height);
+                gl.uniform2f(gl.getUniformLocation(shaderProgram, "resolution"), this.width, this.height);
 
-                gl.uniform2fv(
-                    gl.getUniformLocation(shaderProgram, "points"),
-                    new Float32Array(this.points.flatMap(point => [point.x, this.height - point.y]))
-                );
+                const pointData = new Float32Array([...this.points.flatMap(p => [p.x / this.width, (this.height - p.y) / this.height]), ...(new Array(2 * (textureWidth - (this.points.length % textureWidth)))).fill([0,0])]);
+                const pointHeight = Math.ceil(pointData.length / (2.0 * textureWidth));
 
-                const textureWidth = 100;
-                const textureData = new Uint8Array([...this.points.flatMap(point => [...point.colorArray, 0xFF]), ...(new Array(4 * (textureWidth - (this.points.length % textureWidth)))).fill(0xFF)]);
-                const textureHeight = Math.ceil(textureData.length / (4.0 * textureWidth));
-
-                const texture = gl.createTexture();
-                gl.bindTexture(gl.TEXTURE_2D, texture);
+                const pointTexture = gl.createTexture();
+                gl.bindTexture(gl.TEXTURE_2D, pointTexture);
                 gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
                 gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
                 gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-                gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, textureWidth, textureHeight, 0, gl.RGBA, gl.UNSIGNED_BYTE, textureData);
-                gl.uniform1f(gl.getUniformLocation(shaderProgram, "textureHeight"), textureHeight);
+                gl.texImage2D(gl.TEXTURE_2D, 0, gl.RG16F, textureWidth, pointHeight, 0, gl.RG, gl.FLOAT, pointData);
+                gl.uniform1f(gl.getUniformLocation(shaderProgram, "pointTextureHeight"), pointHeight);
+
+                const colorData = new Uint8Array([...this.points.flatMap(point => [...point.colorArray, 0xFF]), ...(new Array(4 * (textureWidth - (this.points.length % textureWidth)))).fill(0xFF)]);
+                const colorHeight = Math.ceil(colorData.length / (4.0 * textureWidth));
+
+                const colorTexture = gl.createTexture();
+                gl.bindTexture(gl.TEXTURE_2D, colorTexture);
+                gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+                gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+                gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+                gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, textureWidth, colorHeight, 0, gl.RGBA, gl.UNSIGNED_BYTE, colorData);
+                gl.uniform1f(gl.getUniformLocation(shaderProgram, "colorTextureHeight"), colorHeight);
+
+                gl.uniform1i(gl.getUniformLocation(shaderProgram, "u_pointTexture"), 0);  // texture unit 0
+                gl.uniform1i(gl.getUniformLocation(shaderProgram, "u_colorTexture"), 1);  // texture unit 1
+
+                // Set each texture unit to use a particular texture.
+                gl.activeTexture(gl.TEXTURE0);
+                gl.bindTexture(gl.TEXTURE_2D, pointTexture);
+                gl.activeTexture(gl.TEXTURE1);
+                gl.bindTexture(gl.TEXTURE_2D, colorTexture);
             });
 
             this.isDrawn = true;
