@@ -1,381 +1,398 @@
 <!DOCTYPE html>
 <html>
-  <head>
-    <title>Voronoi Generator</title>
-    <script type="text/javascript">//<![CDATA[
-      "use strict";
+<head>
+  <title>Voronoi Generator</title>
+  <script type="text/javascript">//<![CDATA[
+    "use strict";
 
-      function initVoronoi(vor){
-        vor.canvas = vor.querySelector("canvas");
-        vor.canvas.ctx = vor.canvas.getContext("2d");
-        vor.canvas.points = [];
-        vor.canvas.isDrawn = false;
-        vor.canvas.getPoint = getPoint;
-        vor.canvas.clearAll = clearAll;
-        vor.canvas.drawPoints = drawPoints;
-        vor.canvas.fillAreas = fillAreasParallel;
-        vor.pointCount = vor.querySelector(".pointCount");
-        vor.canvas.addEventListener("click", addPoint);
-        vor.canvas.addEventListener("dragover", function(evt){
-          evt.preventDefault();
-        });
-        vor.canvas.addEventListener("drop", dropImage);
+    function initVoronoi(vor) {
+      vor.canvas = vor.querySelector("canvas");
+      resizeCanvas(vor.canvas);
 
-        const genPoints = vor.querySelector(".genPoints");
-        genPoints.vor = vor;
-        genPoints.addEventListener("click", generatePoints);
+      vor.canvas.ctx = vor.canvas.getContext("2d");
+      vor.canvas.points = [];
+      vor.canvas.isDrawn = false;
+      vor.canvas.getPoint = getPoint;
+      vor.canvas.clearAll = clearAll;
+      vor.canvas.drawPoints = drawPoints;
+      vor.canvas.fillAreas = fillAreasParallel;
+      vor.pointCount = vor.querySelector(".pointCount");
+      vor.canvas.addEventListener("click", addPoint);
+      vor.canvas.addEventListener("dragover", function (evt) {
+        evt.preventDefault();
+      });
+      vor.canvas.addEventListener("drop", dropImage);
 
-        const drawBtn = vor.querySelector(".drawBtn");
-        drawBtn.vor = vor;
-        drawBtn.addEventListener("click", drawDiagram);
+      const genPoints = vor.querySelector(".genPoints");
+      genPoints.vor = vor;
+      genPoints.addEventListener("click", generatePoints);
 
-        const clearBtn = vor.querySelector(".clear");
-        clearBtn.vor = vor;
-        clearBtn.addEventListener("click", clearPoints);
+      const drawBtn = vor.querySelector(".drawBtn");
+      drawBtn.vor = vor;
+      drawBtn.addEventListener("click", drawDiagram);
 
-        const colorBtn = vor.querySelector(".colorChange");
-        colorBtn.vor = vor;
-        colorBtn.addEventListener("click", changeColors);
+      const clearBtn = vor.querySelector(".clear");
+      clearBtn.vor = vor;
+      clearBtn.addEventListener("click", clearPoints);
 
-        const downBtn = vor.querySelector(".download");
-        downBtn.vor = vor;
-        downBtn.addEventListener("click", downloadImage);
+      const colorBtn = vor.querySelector(".colorChange");
+      colorBtn.vor = vor;
+      colorBtn.addEventListener("click", changeColors);
+
+      const downBtn = vor.querySelector(".download");
+      downBtn.vor = vor;
+      downBtn.addEventListener("click", downloadImage);
+    }
+
+    function resizeCanvas(canvas) {
+      if (window.devicePixelRatio !== 1) {
+        canvas.style.width = canvas.width + "px";
+        canvas.style.height = canvas.height + "px";
+        canvas.width *= window.devicePixelRatio;
+        canvas.height *= window.devicePixelRatio;
+      }
+    }
+
+    function generatePoints(evt) {
+      const vor = this.vor;
+
+      const numPoints = vor.pointCount.valueAsNumber;
+
+      vor.canvas.points = new Array(numPoints);
+      for (let i = 0; i < numPoints; i++) {
+        vor.canvas.points[i] = vor.canvas.getPoint(Math.floor(Math.random() * (vor.canvas.width + 1)), Math.floor(Math.random() * (vor.canvas.height + 1)));
       }
 
-      function generatePoints(evt){
-        const vor = this.vor;
-
-        const numPoints = vor.pointCount.valueAsNumber;
-
-        vor.canvas.points = new Array(numPoints);
-        for(let i = 0; i < numPoints; i++){
-          vor.canvas.points[i] = vor.canvas.getPoint(Math.floor(Math.random() * (vor.canvas.width + 1)), Math.floor(Math.random() * (vor.canvas.height + 1)));
+      /*var pointSpacing = 20;
+      var isOdd = false;
+      for(var y = pointSpacing / 2; y < vor.canvas.height; y += pointSpacing){
+        isOdd = !isOdd;
+        for(var x = isOdd ? pointSpacing : pointSpacing / 2; x < vor.canvas.width; x += pointSpacing){
+          vor.canvas.points.push(new VorPoint(x, y));
         }
+      }*/
 
-        /*var pointSpacing = 20;
-        var isOdd = false;
-        for(var y = pointSpacing / 2; y < vor.canvas.height; y += pointSpacing){
-          isOdd = !isOdd;
-          for(var x = isOdd ? pointSpacing : pointSpacing / 2; x < vor.canvas.width; x += pointSpacing){
-            vor.canvas.points.push(new VorPoint(x, y));
-          }
-        }*/
+      vor.canvas.clearAll();
+      vor.canvas.drawPoints();
 
-        vor.canvas.clearAll();
-        vor.canvas.drawPoints();
+      vor.querySelector(".drawBtn").disabled = false;
+      vor.querySelector(".colorChange").disabled = true;
+    }
 
-        vor.querySelector(".drawBtn").disabled = false;
-        vor.querySelector(".colorChange").disabled = true;
+    function clearAll() {
+      this.isDrawn = false;
+      this.ctx.clearRect(0, 0, this.width, this.height);
+      if (this.imageBmp) {
+        this.ctx.save();
+        this.ctx.globalAlpha = 0.5;
+        this.ctx.drawImage(this.imageBmp, 0, 0);
+        this.ctx.restore();
       }
+    }
 
-      function clearAll(){
-        this.isDrawn = false;
-        this.ctx.clearRect(0, 0, this.width, this.height);
-        if(this.imageBmp){
-          this.ctx.save();
-          this.ctx.globalAlpha = 0.5;
-          this.ctx.drawImage(this.imageBmp, 0, 0);
-          this.ctx.restore();
-        }
+    function getPoint(x, y) {
+      if (this.image) {
+        const i = 4 * (y * this.width + x);
+        const color = this.image.data.slice(i, i + 3);
+        return new VorPoint(x, y, color);
       }
+      else return new VorPoint(x, y);
+    }
 
-      function getPoint(x, y){
-        if(this.image){
-          const i = 4 * (y * this.width + x);
-          const color = this.image.data.slice(i, i + 3);
-          return new VorPoint(x, y, color);
-        }
-        else return new VorPoint(x, y);
+    function drawPoints(onlyLast) {
+      const ctx = this.ctx;
+      ctx.fillStyle = "#000000";
+      if (onlyLast) {
+        const point = this.points[this.points.length - 1];
+        ctx.fillRect(point.x - 1, point.y - 1, 3, 3);
       }
-
-      function drawPoints(onlyLast){
-        const ctx = this.ctx;
-        ctx.fillStyle = "#000000";
-        if(onlyLast){
-          const point = this.points[this.points.length - 1];
-          ctx.fillRect(point.x-1, point.y-1, 3, 3);
-        }
-        else{
-          this.points.forEach(function(point){
-            ctx.fillRect(point.x-1, point.y-1, 3, 3);
-          });
-        }
-      }
-
-      function addPoint(evt){
-        const rect = this.getBoundingClientRect();
-        const x = evt.clientX - rect.left;
-        const y = evt.clientY - rect.top;
-        this.points.push(this.getPoint(x, y));
-        this.isDrawn ? this.fillAreas() : this.drawPoints(true);
-      }
-
-      function dropImage(evt){
-        let imageFile = null;
-        for(const i = 0; i < evt.dataTransfer.files.length; i++){
-          const curFile = evt.dataTransfer.files[i];
-          if(curFile.type.startsWith("image")){
-            imageFile = curFile;
-            break;
-          }
-        }
-
-        if(imageFile){
-          evt.preventDefault();
-        }
-        else return;
-
-        const canv = this;
-
-        createImageBitmap(imageFile).then(function(imgBmp){
-          const hid = document.createElement("canvas");
-          hid.width = imgBmp.width;
-          hid.height = imgBmp.height;
-          hid.ctx = hid.getContext("2d");
-          hid.ctx.drawImage(imgBmp, 0, 0);
-          const imgData = hid.ctx.getImageData(0, 0, hid.width, hid.height);
-
-          canv.width = hid.width;
-          canv.height = hid.height;
-          canv.imageBmp = imgBmp;
-          canv.image = imgData;
-          canv.points = [];
-          canv.clearAll();
-
-          document.getElementById("useAvgLbl").hidden = false;
-        });
-        //document.getElementById("testImage").src = URL.createObjectURL(imageFile);
-      }
-
-      function drawDiagram(evt){
-        this.vor.canvas.fillAreas();
-        this.vor.querySelector(".colorChange").disabled = false;
-      }
-
-      function clearPoints(evt){
-        this.vor.canvas.points = [];
-        this.vor.canvas.clearAll();
-        vor.querySelector(".drawBtn").disabled = true;
-        vor.querySelector(".colorChange").disabled = true;
-      }
-
-      function changeColors(evt){
-        this.vor.canvas.points.forEach(function(point){point.colorArray = randomColor();});
-        this.vor.canvas.fillAreas();
-      }
-
-      function downloadImage(evt){
-        const data = this.vor.canvas.toBlob(function(blob){
-          const imgUrl = URL.createObjectURL(blob);
-          const imgLink = document.querySelector("a.imgLink");
-          imgLink.href = imgUrl;
-          imgLink.download = "voronoi.png";
-          imgLink.click();
+      else {
+        this.points.forEach(function (point) {
+          ctx.fillRect(point.x - 1, point.y - 1, 3, 3);
         });
       }
+    }
 
-      function fillAreasBrute(){
-        const startTime = new Date();
-        const colorMap = {};
-        const useAvg = this.image && document.getElementById("useAvg").checked;
-        const imgData = this.ctx.createImageData(this.width, this.height);
-        for(let y = 0; y < this.height; y++){
-          for(let x = 0; x < this.width; x++){
-            const closestPoint = findClosestPoint(this.points, x, y);
+    function addPoint(evt) {
+      const rect = this.getBoundingClientRect();
+      const x = evt.clientX - rect.left;
+      const y = evt.clientY - rect.top;
+      this.points.push(this.getPoint(x * window.devicePixelRatio, y * window.devicePixelRatio));
+      this.isDrawn ? this.fillAreas() : this.drawPoints(true);
+    }
 
-            if(useAvg){
-              let pxList = colorMap[closestPoint];
-              if(!pxList){
-                pxList = [];
-                colorMap[closestPoint] = pxList;
-              }
-              pxList.push({x: x, y: y});
+    function dropImage(evt) {
+      let imageFile = null;
+      for (const i = 0; i < evt.dataTransfer.files.length; i++) {
+        const curFile = evt.dataTransfer.files[i];
+        if (curFile.type.startsWith("image")) {
+          imageFile = curFile;
+          break;
+        }
+      }
+
+      if (imageFile) {
+        evt.preventDefault();
+      }
+      else return;
+
+      const canv = this;
+
+      createImageBitmap(imageFile).then(function (imgBmp) {
+        const hid = document.createElement("canvas");
+        hid.width = imgBmp.width;
+        hid.height = imgBmp.height;
+        hid.ctx = hid.getContext("2d");
+        hid.ctx.drawImage(imgBmp, 0, 0);
+        const imgData = hid.ctx.getImageData(0, 0, hid.width, hid.height);
+
+        canv.width = hid.width;
+        canv.height = hid.height;
+        if (window.devicePixelRatio !== 1) {
+          this.style.width = (this.width / window.devicePixelRatio) + "px";
+          this.style.height = (this.height / window.devicePixelRatio) + "px";
+        }
+        canv.imageBmp = imgBmp;
+        canv.image = imgData;
+        canv.points = [];
+        canv.clearAll();
+
+        document.getElementById("useAvgLbl").hidden = false;
+      });
+      //document.getElementById("testImage").src = URL.createObjectURL(imageFile);
+    }
+
+    function drawDiagram(evt) {
+      this.vor.canvas.fillAreas();
+      this.vor.querySelector(".colorChange").disabled = false;
+    }
+
+    function clearPoints(evt) {
+      this.vor.canvas.points = [];
+      this.vor.canvas.clearAll();
+      vor.querySelector(".drawBtn").disabled = true;
+      vor.querySelector(".colorChange").disabled = true;
+    }
+
+    function changeColors(evt) {
+      this.vor.canvas.points.forEach(function (point) { point.colorArray = randomColor(); });
+      this.vor.canvas.fillAreas();
+    }
+
+    function downloadImage(evt) {
+      const data = this.vor.canvas.toBlob(function (blob) {
+        const imgUrl = URL.createObjectURL(blob);
+        const imgLink = document.querySelector("a.imgLink");
+        imgLink.href = imgUrl;
+        imgLink.download = "voronoi.png";
+        imgLink.click();
+      });
+    }
+
+    function fillAreasBrute() {
+      const startTime = new Date();
+      const colorMap = {};
+      const useAvg = this.image && document.getElementById("useAvg").checked;
+      const imgData = this.ctx.createImageData(this.width, this.height);
+      for (let y = 0; y < this.height; y++) {
+        for (let x = 0; x < this.width; x++) {
+          const closestPoint = findClosestPoint(this.points, x, y);
+
+          if (useAvg) {
+            let pxList = colorMap[closestPoint];
+            if (!pxList) {
+              pxList = [];
+              colorMap[closestPoint] = pxList;
             }
-            else applyColorToImage(imgData, this.width, x, y, closestPoint.colorArray);
+            pxList.push({ x: x, y: y });
           }
+          else applyColorToImage(imgData, this.width, x, y, closestPoint.colorArray);
         }
-        if(useAvg){
-          const cWidth = this.width;
-          for(const point in colorMap){
-            const pxList = colorMap[point];
-            const colorTotal = [0, 0, 0];
-            for(let i = 0; i < pxList.length; i++){
-              const px = pxList[i];
-              const idx = 4 * (px.y * this.width + px.x);
-              colorTotal[0] += this.image.data[idx];
-              colorTotal[1] += this.image.data[idx+1];
-              colorTotal[2] += this.image.data[idx+2];
-            }
-            const colorAvg = colorTotal.map(function(d){return d / pxList.length;});
-            pxList.forEach(function(px){applyColorToImage(imgData, cWidth, px.x, px.y, colorAvg);});
-          }
-        }
-        this.ctx.putImageData(imgData, 0, 0);
-        if(!this.image) this.drawPoints();
-        this.isDrawn = true;
-        const elapsed = (new Date()) - startTime;
-        console.log(`${elapsed / 1000}s`);
       }
+      if (useAvg) {
+        const cWidth = this.width;
+        for (const point in colorMap) {
+          const pxList = colorMap[point];
+          const colorTotal = [0, 0, 0];
+          for (let i = 0; i < pxList.length; i++) {
+            const px = pxList[i];
+            const idx = 4 * (px.y * this.width + px.x);
+            colorTotal[0] += this.image.data[idx];
+            colorTotal[1] += this.image.data[idx + 1];
+            colorTotal[2] += this.image.data[idx + 2];
+          }
+          const colorAvg = colorTotal.map(function (d) { return d / pxList.length; });
+          pxList.forEach(function (px) { applyColorToImage(imgData, cWidth, px.x, px.y, colorAvg); });
+        }
+      }
+      this.ctx.putImageData(imgData, 0, 0);
+      if (!this.image) this.drawPoints();
+      this.isDrawn = true;
+      const elapsed = (new Date()) - startTime;
+      console.log(`${elapsed / 1000}s`);
+    }
 
-      const fnsToInclude = [workerFn, findClosestPoint, sqDistanceTo];
-      const workerParams = workerFn.toString().match(/\(([^\)]+)\)/)[1];
-      const workers = [];
-      console.log(`${navigator.hardwareConcurrency} workers available`)
-      for(let i = 0; i < navigator.hardwareConcurrency; i++) {
-        let workerScript = fnsToInclude.map(fn => fn.toString()).join('\n') + '\n';
-        workerScript += `onmessage = (e) => {
+    const fnsToInclude = [workerFn, findClosestPoint, sqDistanceTo];
+    const workerParams = workerFn.toString().match(/\(([^\)]+)\)/)[1];
+    const workers = [];
+    console.log(`${navigator.hardwareConcurrency} workers available`)
+    for (let i = 0; i < navigator.hardwareConcurrency; i++) {
+      let workerScript = fnsToInclude.map(fn => fn.toString()).join('\n') + '\n';
+      workerScript += `onmessage = (e) => {
           const {${workerParams}} = e.data[0];
           const result = workerFn(${workerParams});
           postMessage([result]);}`;
-        const blob = new Blob([workerScript], {type: 'application/javascript'});
-        const worker = new Worker(URL.createObjectURL(blob));
-        worker.runAsync = function(data) {
-          this.postMessage([data]);
-          return new Promise((resolve, reject) => {
-            this.onmessage = (e) => {
-              resolve(e.data[0]);
-            }
-          })
-        }
-        workers.push(worker);
-      }
-
-      function workerFn(start, end, width, points) {
-        const colorData = [];
-        for(let y = start; y < end; y++){
-          const colorRow = [];
-          for(let x = 0; x < width; x++){
-            const closestPoint = findClosestPoint(points, x, y);
-            colorRow.push(closestPoint.colorArray);
+      const blob = new Blob([workerScript], { type: 'application/javascript' });
+      const worker = new Worker(URL.createObjectURL(blob));
+      worker.runAsync = function (data) {
+        this.postMessage([data]);
+        return new Promise((resolve, reject) => {
+          this.onmessage = (e) => {
+            resolve(e.data[0]);
           }
-          colorData.push(colorRow);
-        }
-        return colorData;
+        })
       }
+      workers.push(worker);
+    }
 
-      async function fillAreasParallel() {
-        const startTime = new Date();
-        const imgData = this.ctx.createImageData(this.width, this.height);
-        const chunkSize = Math.ceil(this.height / workers.length);
-        await Promise.all(workers.map((worker, i) => {
-          const start = i * chunkSize;
-          const end = Math.min(start + chunkSize, this.height);
-          return worker.runAsync({start, end, width: this.width, points: this.points})
-            .then(colorData => {
-              for(let y = 0; y < colorData.length; y++) {
-                for(let x = 0; x < this.width; x++) {
-                  applyColorToImage(imgData, this.width, x, y + start, colorData[y][x]);
-                }
+    function workerFn(start, end, width, points) {
+      const colorData = [];
+      for (let y = start; y < end; y++) {
+        const colorRow = [];
+        for (let x = 0; x < width; x++) {
+          const closestPoint = findClosestPoint(points, x, y);
+          colorRow.push(closestPoint.colorArray);
+        }
+        colorData.push(colorRow);
+      }
+      return colorData;
+    }
+
+    async function fillAreasParallel() {
+      const startTime = new Date();
+      const imgData = this.ctx.createImageData(this.width, this.height);
+      const chunkSize = Math.ceil(this.height / workers.length);
+      await Promise.all(workers.map((worker, i) => {
+        const start = i * chunkSize;
+        const end = Math.min(start + chunkSize, this.height);
+        return worker.runAsync({ start, end, width: this.width, points: this.points })
+          .then(colorData => {
+            for (let y = 0; y < colorData.length; y++) {
+              for (let x = 0; x < this.width; x++) {
+                applyColorToImage(imgData, this.width, x, y + start, colorData[y][x]);
               }
-            });
-        }));
-        this.ctx.putImageData(imgData, 0, 0);
-        if(!this.image) this.drawPoints();
-        this.isDrawn = true;
-        const elapsed = (new Date()) - startTime;
-        console.log(`${elapsed / 1000}s`);
+            }
+          });
+      }));
+      this.ctx.putImageData(imgData, 0, 0);
+      if (!this.image) this.drawPoints();
+      this.isDrawn = true;
+      const elapsed = (new Date()) - startTime;
+      console.log(`${elapsed / 1000}s`);
+    }
+
+    function fillAreasLines() {
+      const lineCount = 100000;
+      this.clearAll();
+      for (let i = 0; i < lineCount; i++) {
+        const x = Math.floor(Math.random() * (this.width + 1));
+        const y = Math.floor(Math.random() * (this.height + 1));
+
+        const closestPoint = findClosestPoint(this.points, x, y).point;
+
+        this.ctx.strokeStyle = closestPoint.color;
+        this.ctx.beginPath();
+        this.ctx.moveTo(x, y);
+        this.ctx.lineTo(closestPoint.x, closestPoint.y);
+        this.ctx.stroke();
       }
+      //window.requestAnimationFrame(fillAreasLines.bind(this));
+      this.drawPoints();
+      this.isDrawn = true;
+    }
 
-      function fillAreasLines(){
-        const lineCount = 100000;
-        this.clearAll();
-        for(let i = 0; i < lineCount; i++){
-          const x = Math.floor(Math.random() * (this.width + 1));
-          const y = Math.floor(Math.random() * (this.height + 1));
-
-          const closestPoint = findClosestPoint(this.points, x, y).point;
-
-          this.ctx.strokeStyle = closestPoint.color;
-          this.ctx.beginPath();
-          this.ctx.moveTo(x, y);
-          this.ctx.lineTo(closestPoint.x, closestPoint.y);
-          this.ctx.stroke();
+    function findClosestPoint(points, x, y) {
+      let closestPoint = null;
+      let closestDist = -1;
+      for (let i = 0; i < points.length; i++) {
+        const cur = points[i];
+        const dist = sqDistanceTo(cur.x, cur.y, x, y);
+        if (closestDist === -1 || closestDist > dist) {
+          closestPoint = cur;
+          closestDist = dist;
         }
-        //window.requestAnimationFrame(fillAreasLines.bind(this));
-        this.drawPoints();
-        this.isDrawn = true;
       }
+      return closestPoint;
+    }
 
-      function findClosestPoint(points, x, y){
-        let closestPoint = null;
-        let closestDist = -1;
-        for(let i = 0; i < points.length; i++) {
-          const cur = points[i];
-          const dist = sqDistanceTo(cur.x, cur.y, x, y);
-          if(closestDist === -1 || closestDist > dist) {
-            closestPoint = cur;
-            closestDist = dist;
-          }
-        }
-        return closestPoint;
-      }
+    function applyColorToImage(imgData, width, x, y, color) {
+      const i = 4 * (y * width + x);
+      imgData.data[i] = color[0];
+      imgData.data[i + 1] = color[1];
+      imgData.data[i + 2] = color[2];
+      imgData.data[i + 3] = 255;
+    }
 
-      function applyColorToImage(imgData, width, x, y, color){
-        const i = 4 * (y * width + x);
-        imgData.data[i] = color[0];
-        imgData.data[i+1] = color[1];
-        imgData.data[i+2] = color[2];
-        imgData.data[i+3] = 255;
-      }
+    function VorPoint(x, y, color) {
+      this.x = x;
+      this.y = y;
+      this.colorArray = color || randomColor();
+      this.color = colorFromArray(this.colorArray);
+    }
 
-      function VorPoint(x, y, color){
-        this.x = x;
-        this.y = y;
-        this.colorArray = color || randomColor();
-        this.color = colorFromArray(this.colorArray);
-      }
+    VorPoint.prototype = {
+      x: 0,
+      y: 0,
+      color: "",
+      colorArray: [],
+      toString() { return `${this.x},${this.y}`; }
+    };
 
-      VorPoint.prototype = {
-        x: 0,
-        y: 0,
-        color: "",
-        colorArray: [],
-        toString(){return `${this.x},${this.y}`;}
-      };
+    function sqDistanceTo(ax, ay, bx, by) {
+      const c = ax - bx;
+      const d = ay - by;
+      return c * c + d * d; // Euclidean
+      //return Math.abs(c) + Math.abs(d); // Manhattan
+    }
 
-      function sqDistanceTo(ax, ay, bx, by) {
-        const c = ax - bx;
-        const d = ay - by;
-        return c*c + d*d; // Euclidean
-        //return Math.abs(c) + Math.abs(d); // Manhattan
-      }
+    function distanceTo(ax, ay, bx, by) {
+      return Math.sqrt(sqDistanceTo(ax, ay, bx, by));
+    }
 
-      function distanceTo(ax, ay, bx, by) {
-        return Math.sqrt(sqDistanceTo(ax, ay, bx, by));
-      }
+    function randomChannel() {
+      return Math.floor(Math.random() * 0x100);
+    }
 
-      function randomChannel(){
-        return Math.floor(Math.random() * 0x100);
-      }
+    function randomColor() {
+      return [randomChannel(), randomChannel(), randomChannel()];
+    }
 
-      function randomColor(){
-        return [randomChannel(), randomChannel(), randomChannel()];
-      }
+    function colorFromArray(array) {
+      return "rgb(" + array.join(",") + ")";
+    }
 
-      function colorFromArray(array){
-        return "rgb(" + array.join(",") + ")";
-      }
-
-      window.addEventListener("load", function(){
-        document.querySelectorAll(".voronoi").forEach(initVoronoi);
-      })
+    window.addEventListener("load", function () {
+      document.querySelectorAll(".voronoi").forEach(initVoronoi);
+    })
     //]]></script>
-  </head>
-  <body>
-    <div class="voronoi">
-      <canvas width="800" height="600" style="border: 1px solid black;"></canvas>
-      <div class="controls">
-        <label>Number of points: <input class="pointCount" type="number" pattern="\d*" min="0" value="100" required /></label>
-        <label id="useAvgLbl" hidden>Use average color: <input type="checkbox" id="useAvg" checked /></label>
-        <br />
-        <button class="genPoints">Place Points</button>
-        <button class="drawBtn" disabled>Draw Diagram</button>
-        <button class="clear">Clear</button>
-        <button class="colorChange" disabled>Change Colors</button>
-        <button class="download">Download Image</button>
-        <a class="imgLink" style="display: none">image download</a>
-      </div>
-      <!--<img id="testImage" />-->
+</head>
+
+<body>
+  <div class="voronoi">
+    <canvas width="800" height="600" style="border: 1px solid black;"></canvas>
+    <div class="controls">
+      <label>Number of points: <input class="pointCount" type="number" pattern="\d*" min="0" value="100"
+          required /></label>
+      <label id="useAvgLbl" hidden>Use average color: <input type="checkbox" id="useAvg" checked /></label>
+      <br />
+      <button class="genPoints">Place Points</button>
+      <button class="drawBtn" disabled>Draw Diagram</button>
+      <button class="clear">Clear</button>
+      <button class="colorChange" disabled>Change Colors</button>
+      <button class="download">Download Image</button>
+      <a class="imgLink" style="display: none">image download</a>
     </div>
-  </body>
+    <!--<img id="testImage" />-->
+  </div>
+</body>
 </html>
