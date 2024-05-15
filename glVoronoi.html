@@ -1,6 +1,5 @@
 <!DOCTYPE html>
 <html>
-
 <head>
     <title>Voronoi Generator</title>
     <script type="text/javascript">//<![CDATA[
@@ -20,7 +19,7 @@
             vor.canvas.addEventListener("dragover", function (evt) {
                 evt.preventDefault();
             });
-            //vor.canvas.addEventListener("drop", dropImage);
+            vor.canvas.addEventListener("drop", dropImage);
 
             const genPoints = vor.querySelector(".genPoints");
             genPoints.vor = vor;
@@ -50,7 +49,7 @@
 
             vor.canvas.points = new Array(numPoints);
             for (let i = 0; i < numPoints; i++) {
-                vor.canvas.points[i] = vor.canvas.getPoint(Math.floor(Math.random() * (vor.canvas.width + 1)), Math.floor(Math.random() * (vor.canvas.height + 1)));
+                vor.canvas.points[i] = vor.canvas.getPoint(Math.floor(Math.random() * (vor.canvas.width)), Math.floor(Math.random() * (vor.canvas.height)));
             }
 
             /*var pointSpacing = 20;
@@ -109,42 +108,41 @@
             this.isDrawn ? this.fillAreas() : this.drawPoints(true);
         }
 
-        //   function dropImage(evt){
-        //     let imageFile = null;
-        //     for(const i = 0; i < evt.dataTransfer.files.length; i++){
-        //       const curFile = evt.dataTransfer.files[i];
-        //       if(curFile.type.startsWith("image")){
-        //         imageFile = curFile;
-        //         break;
-        //       }
-        //     }
+        function dropImage(evt) {
+            let imageFile = null;
+            for (const i = 0; i < evt.dataTransfer.files.length; i++) {
+                const curFile = evt.dataTransfer.files[i];
+                if (curFile.type.startsWith("image")) {
+                    imageFile = curFile;
+                    break;
+                }
+            }
 
-        //     if(imageFile){
-        //       evt.preventDefault();
-        //     }
-        //     else return;
+            if (imageFile) {
+                evt.preventDefault();
+            }
+            else return;
 
-        //     const canv = this;
+            createImageBitmap(imageFile).then(imgBmp => {
+                const hid = document.createElement("canvas");
+                hid.width = imgBmp.width;
+                hid.height = imgBmp.height;
+                hid.ctx = hid.getContext("2d");
+                hid.ctx.drawImage(imgBmp, 0, 0);
+                const imgData = hid.ctx.getImageData(0, 0, hid.width, hid.height);
 
-        //     createImageBitmap(imageFile).then(function(imgBmp){
-        //       const hid = document.createElement("canvas");
-        //       hid.width = imgBmp.width;
-        //       hid.height = imgBmp.height;
-        //       hid.ctx = hid.getContext("2d");
-        //       hid.ctx.drawImage(imgBmp, 0, 0);
-        //       const imgData = hid.ctx.getImageData(0, 0, hid.width, hid.height);
+                this.width = hid.width;
+                this.height = hid.height;
+                this.gl.viewport(0, 0, this.width, this.height);
+                this.imageBmp = imgBmp;
+                this.image = imgData;
+                this.points = [];
+                this.clearAll();
 
-        //       canv.width = hid.width;
-        //       canv.height = hid.height;
-        //       canv.imageBmp = imgBmp;
-        //       canv.image = imgData;
-        //       canv.points = [];
-        //       canv.clearAll();
-
-        //       document.getElementById("useAvgLbl").hidden = false;
-        //     });
-        //     //document.getElementById("testImage").src = URL.createObjectURL(imageFile);
-        //   }
+                //document.getElementById("useAvgLbl").hidden = false;
+            });
+            //document.getElementById("testImage").src = URL.createObjectURL(imageFile);
+        }
 
         function drawDiagram(evt) {
             this.vor.canvas.fillAreas();
@@ -164,6 +162,7 @@
         }
 
         function downloadImage(evt) {
+            this.vor.canvas.fillAreas();
             const data = this.vor.canvas.toBlob(function (blob) {
                 const imgUrl = URL.createObjectURL(blob);
                 const imgLink = document.querySelector("a.imgLink");
@@ -241,10 +240,8 @@
             );
 
             const textureWidth = 100;
-            const textureData = new Uint8Array([...this.points.flatMap(point => [...point.colorArray.map(f => Math.floor(f * 0x100)), 0xFF]), ...(new Array(4 * (textureWidth - (this.points.length % textureWidth)))).fill(0xFF)]);
+            const textureData = new Uint8Array([...this.points.flatMap(point => [...point.colorArray, 0xFF]), ...(new Array(4 * (textureWidth - (this.points.length % textureWidth)))).fill(0xFF)]);
             const textureHeight = Math.ceil(textureData.length / (4.0 * textureWidth));
-
-            
 
             const texture = gl.createTexture();
             gl.bindTexture(gl.TEXTURE_2D, texture);
@@ -384,7 +381,7 @@
         };
 
         function randomChannel() {
-            return Math.random();
+            return Math.floor(Math.random() * 0x100);
         }
 
         function randomColor() {
@@ -415,5 +412,4 @@
         <!--<img id="testImage" />-->
     </div>
 </body>
-
 </html>
