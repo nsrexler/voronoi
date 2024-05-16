@@ -19,6 +19,13 @@
                 let originY = -2.0;
                 let viewWidth = 4.0;
 
+                if(location.hash){
+                    const hashParams = new URLSearchParams(location.hash.slice(1));
+                    originX = hashParams.get("originX");
+                    originY = hashParams.get("originY");
+                    viewWidth = hashParams.get("viewWidth")
+                }
+
                 const zoomFactor = 2.0;
 
                 canvas.addEventListener("click", (evt) => {
