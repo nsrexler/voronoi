@@ -23,6 +23,8 @@
                 let juliaX = 0;
                 let juliaY = 0;
 
+                let shaderHandle = null;
+
                 if(location.hash) {
                     const hashParams = new URLSearchParams(location.hash.slice(1));
                     originX = Number(hashParams.get("originX") ?? originX);
@@ -45,7 +47,7 @@
                     originY = Math.min(Math.max(y - (newWidth / 2.0), originY), originY + viewWidth - newWidth);
                     viewWidth = newWidth;
                     setHash();
-                    draw();
+                    redraw();
                 });
 
                 document.querySelector("button.resetView").addEventListener("click", () => {
@@ -53,7 +55,7 @@
                     originY = -2.0;
                     viewWidth = 4.0;
                     location.hash = "";
-                    draw();
+                    redraw();
                 });
 
                 const juliaBtn = document.querySelector("button.pickJulia");
@@ -94,7 +96,7 @@
                         uniform vec2 juliaCoord;
                         uniform vec2 resolution;
                         uniform vec2 origin;
-                        uniform float viewWidth;
+                        uniform highp float viewWidth;
                         uniform sampler2D colorMap;
 
                         vec4 getColor(int index) {
@@ -121,14 +123,14 @@
                             gl_FragColor = vec4(0.0, 0.0, 0.0, 1.0);
                             for(int i = 0; i < iterations; i++){
                                 z = vec2((z.x * z.x) - (z.y * z.y), 2.0 * z.x * z.y) + c;
-                                if(length(z) > 4.0){
+                                if(length(z) > 2.0){
                                     gl_FragColor = getColor(i);
                                 }
                             }
                         }
                     `;
 
-                    draw2DShader(gl, fsSource, (shaderProgram) => {
+                    shaderHandle = draw2DShader(gl, fsSource, (shaderProgram) => {
                         gl.uniform2f(gl.getUniformLocation(shaderProgram, "resolution"), canvas.width, canvas.height);
                         gl.uniform2f(gl.getUniformLocation(shaderProgram, "origin"), originX, originY);
                         gl.uniform1f(gl.getUniformLocation(shaderProgram, "viewWidth"), viewWidth);
@@ -153,6 +155,18 @@
                         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
                         gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, colorData.length / 4, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, colorData);
                     });
+                }
+
+                function redraw() {
+                    if(shaderHandle) {
+                        shaderHandle.redraw((shaderProgram) => {
+                            gl.uniform2f(gl.getUniformLocation(shaderProgram, "origin"), originX, originY);
+                            gl.uniform1f(gl.getUniformLocation(shaderProgram, "viewWidth"), viewWidth);
+                        });
+                    }
+                    else {
+                        draw();
+                    }
                 }
 
                 draw();

@@ -27,6 +27,11 @@ function draw2DShader(gl, fsSource, bindFn) {
     const offset = 0;
     const vertexCount = 4;
     gl.drawArrays(gl.TRIANGLE_STRIP, offset, vertexCount);
+
+    return {redraw(bindFn) {
+        bindFn(shaderProgram);
+        gl.drawArrays(gl.TRIANGLE_STRIP, offset, vertexCount);
+    }}
 }
 
 //
