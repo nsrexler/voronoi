@@ -19,20 +19,27 @@
                 let originY = -2.0;
                 let viewWidth = 4.0;
 
-                if(location.hash){
+                let juliaMode = false;
+                let juliaX = 0;
+                let juliaY = 0;
+
+                if(location.hash) {
                     const hashParams = new URLSearchParams(location.hash.slice(1));
-                    originX = hashParams.get("originX");
-                    originY = hashParams.get("originY");
-                    viewWidth = hashParams.get("viewWidth")
+                    originX = Number(hashParams.get("originX") ?? originX);
+                    originY = Number(hashParams.get("originY") ?? originY);
+                    viewWidth = Number(hashParams.get("viewWidth") ?? viewWidth);
+                    juliaMode = Boolean(hashParams.get("juliaMode") ?? juliaMode);
+                    juliaX = Number(hashParams.get("x") ?? juliaX);
+                    juliaY = Number(hashParams.get("y") ?? juliaY);
                 }
+
+                let pickMode = false;
 
                 const zoomFactor = 2.0;
 
                 canvas.addEventListener("click", (evt) => {
-                    const rect = canvas.getBoundingClientRect();
-                    const x = ((evt.clientX - rect.left) * window.devicePixelRatio / canvas.width) * viewWidth + originX;
-                    const y = ((evt.clientY - rect.top) * window.devicePixelRatio / canvas.height) * viewWidth + originY;
-                    //console.log(`${x},${y}`);
+                    if(pickMode) return;
+                    const {x, y} = getRealCoords(evt);
                     const newWidth = viewWidth / zoomFactor;
                     originX = Math.min(Math.max(x - (newWidth / 2.0), originX), originX + viewWidth - newWidth);
                     originY = Math.min(Math.max(y - (newWidth / 2.0), originY), originY + viewWidth - newWidth);
@@ -41,14 +48,48 @@
                     draw();
                 });
 
+                document.querySelector("button.resetView").addEventListener("click", () => {
+                    originX = -2.0;
+                    originY = -2.0;
+                    viewWidth = 4.0;
+                    location.hash = "";
+                    draw();
+                });
+
+                const juliaBtn = document.querySelector("button.pickJulia");
+                if(!juliaMode) {
+                    document.querySelector("button.pickJulia").addEventListener("click", () => {
+                        pickMode = true;
+                        canvas.style.cursor = "crosshair";
+                        canvas.addEventListener("click", (evt) => {
+                            const {x, y} = getRealCoords(evt);
+                            pickMode = false;
+                            canvas.style.cursor = "zoom-out";
+                            window.open(`#juliaMode=true&x=${x}&y=${y}`);
+                        }, {once: true})
+                    });
+                }
+                else {
+                    juliaBtn.hidden = true;
+                }
+
                 function setHash() {
                     location.hash = `originX=${originX}&originY=${originY}&viewWidth=${viewWidth}`;
+                }
+
+                function getRealCoords(evt) {
+                    const rect = canvas.getBoundingClientRect();
+                    const x = ((evt.clientX - rect.left) * window.devicePixelRatio / canvas.width) * viewWidth + originX;
+                    const y = ((evt.clientY - rect.top) * window.devicePixelRatio / canvas.height) * viewWidth + originY;
+                    return {x, y};
                 }
 
                 function draw() {
                     const fsSource = `
                         precision highp float;
                         const int iterations = 1000;
+                        uniform bool juliaMode;
+                        uniform vec2 juliaCoord;
                         uniform vec2 resolution;
                         uniform vec2 origin;
                         uniform float viewWidth;
@@ -66,15 +107,19 @@
                             trans.y = resolution.y - trans.y;
                             vec2 uv = ((trans / resolution) * viewWidth) + origin;
 
-                            float a = 0.0;
-                            float b = 0.0;
+                            vec2 z, c;
+                            if(juliaMode) {
+                                z = uv;
+                                c = juliaCoord;
+                            }
+                            else {
+                                z = vec2(0.0, 0.0);
+                                c = uv;
+                            }
                             gl_FragColor = vec4(0.0, 0.0, 0.0, 1.0);
                             for(int i = 0; i < iterations; i++){
-                                float na = (a * a) - (b * b) + uv.x;
-                                b = (2.0 * a * b) + uv.y;
-                                a = na;
-                                float ab = a * b;
-                                if(ab > 4.0 || ab < -4.0){
+                                z = vec2((z.x * z.x) - (z.y * z.y), 2.0 * z.x * z.y) + c;
+                                if(length(z) > 4.0){
                                     gl_FragColor = getColor(i);
                                 }
                             }
@@ -85,6 +130,8 @@
                         gl.uniform2f(gl.getUniformLocation(shaderProgram, "resolution"), canvas.width, canvas.height);
                         gl.uniform2f(gl.getUniformLocation(shaderProgram, "origin"), originX, originY);
                         gl.uniform1f(gl.getUniformLocation(shaderProgram, "viewWidth"), viewWidth);
+                        gl.uniform1i(gl.getUniformLocation(shaderProgram, "juliaMode"), juliaMode);
+                        gl.uniform2f(gl.getUniformLocation(shaderProgram, "juliaCoord"), juliaX, juliaY);
 
                         const gradient = complexGradient(
                             [0xFF, 0x00, 0x00, 0xFF],
@@ -133,5 +180,9 @@
     </head>
     <body>
         <canvas width="1200" height="1200" style="border: 1px solid black; cursor: zoom-in;"></canvas>
+        <div class="controls">
+            <button class="resetView">Reset Zoom</button>
+            <button class="pickJulia">Pick Julia</button>
+        </div>
     </body>
 </html>
