@@ -60,11 +60,12 @@
                 if(!juliaMode) {
                     document.querySelector("button.pickJulia").addEventListener("click", () => {
                         pickMode = true;
+                        const prev = canvas.style.cursor;
                         canvas.style.cursor = "crosshair";
                         canvas.addEventListener("click", (evt) => {
                             const {x, y} = getRealCoords(evt);
                             pickMode = false;
-                            canvas.style.cursor = "zoom-out";
+                            canvas.style.cursor = prev;
                             window.open(`#juliaMode=true&x=${x}&y=${y}`);
                         }, {once: true})
                     });
@@ -88,6 +89,7 @@
                     const fsSource = `
                         precision highp float;
                         const int iterations = 1000;
+                        const float colorBandwidth = 600.0;
                         uniform bool juliaMode;
                         uniform vec2 juliaCoord;
                         uniform vec2 resolution;
@@ -96,7 +98,7 @@
                         uniform sampler2D colorMap;
 
                         vec4 getColor(int index) {
-                            float colorIndex = float(index) / float(iterations);
+                            float colorIndex = mod(float(index), colorBandwidth) / colorBandwidth;
                             vec2 uv = vec2(colorIndex, 0.5);
                             return texture2D(colorMap, uv);
                         }
@@ -134,12 +136,6 @@
                         gl.uniform2f(gl.getUniformLocation(shaderProgram, "juliaCoord"), juliaX, juliaY);
 
                         const gradient = complexGradient(
-                            [0xFF, 0x00, 0x00, 0xFF],
-                            [0xFF, 0xFF, 0x00, 0xFF],
-                            [0x00, 0xFF, 0x00, 0xFF],
-                            [0x00, 0xFF, 0xFF, 0xFF],
-                            [0x00, 0x00, 0xFF, 0xFF],
-                            [0xFF, 0x00, 0xFF, 0xFF],
                             [0xFF, 0x00, 0x00, 0xFF],
                             [0xFF, 0xFF, 0x00, 0xFF],
                             [0x00, 0xFF, 0x00, 0xFF],
