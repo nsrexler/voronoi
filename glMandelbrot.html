@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <title>WebGL Mandelbrot</title>
+        <script type="text/javascript" src="2dshader.js"></script>
+        <script type="text/javascript">
+            window.addEventListener("load", () => {
+                const canvas = document.querySelector("canvas");
+                if (window.devicePixelRatio !== 1) {
+                    canvas.style.width = canvas.width + "px";
+                    canvas.style.height = canvas.height + "px";
+                    canvas.width *= window.devicePixelRatio;
+                    canvas.height *= window.devicePixelRatio;
+                }
+
+                const gl = canvas.getContext("webgl");
+
+                let originX = -2.0;
+                let originY = -2.0;
+                let viewWidth = 4.0;
+
+                const zoomFactor = 2.0;
+
+                canvas.addEventListener("click", (evt) => {
+                    const rect = canvas.getBoundingClientRect();
+                    const x = ((evt.clientX - rect.left) * window.devicePixelRatio / canvas.width) * viewWidth + originX;
+                    const y = ((evt.clientY - rect.top) * window.devicePixelRatio / canvas.height) * viewWidth + originY;
+                    //console.log(`${x},${y}`);
+                    const newWidth = viewWidth / zoomFactor;
+                    originX = Math.min(Math.max(x - (newWidth / 2.0), originX), originX + viewWidth - newWidth);
+                    originY = Math.min(Math.max(y - (newWidth / 2.0), originY), originY + viewWidth - newWidth);
+                    viewWidth = newWidth;
+                    setHash();
+                    draw();
+                });
+
+                function setHash() {
+                    location.hash = `originX=${originX}&originY=${originY}&viewWidth=${viewWidth}`;
+                }
+
+                function draw() {
+                    const fsSource = `
+                        precision highp float;
+                        const int iterations = 1000;
+                        uniform vec2 resolution;
+                        uniform vec2 origin;
+                        uniform float viewWidth;
+                        uniform sampler2D colorMap;
+
+                        vec4 getColor(int index) {
+                            float colorIndex = float(index) / float(iterations);
+                            vec2 uv = vec2(colorIndex, 0.5);
+                            return texture2D(colorMap, uv);
+                        }
+
+                        void main() {
+                            // Calculate relative coordinates (uv)
+                            vec2 trans = gl_FragCoord.xy;
+                            trans.y = resolution.y - trans.y;
+                            vec2 uv = ((trans / resolution) * viewWidth) + origin;
+
+                            float a = 0.0;
+                            float b = 0.0;
+                            gl_FragColor = vec4(0.0, 0.0, 0.0, 1.0);
+                            for(int i = 0; i < iterations; i++){
+                                float na = (a * a) - (b * b) + uv.x;
+                                b = (2.0 * a * b) + uv.y;
+                                a = na;
+                                float ab = a * b;
+                                if(ab > 4.0 || ab < -4.0){
+                                    gl_FragColor = getColor(i);
+                                }
+                            }
+                        }
+                    `;
+
+                    draw2DShader(gl, fsSource, (shaderProgram) => {
+                        gl.uniform2f(gl.getUniformLocation(shaderProgram, "resolution"), canvas.width, canvas.height);
+                        gl.uniform2f(gl.getUniformLocation(shaderProgram, "origin"), originX, originY);
+                        gl.uniform1f(gl.getUniformLocation(shaderProgram, "viewWidth"), viewWidth);
+
+                        const gradient = complexGradient(
+                            [0xFF, 0x00, 0x00, 0xFF],
+                            [0xFF, 0xFF, 0x00, 0xFF],
+                            [0x00, 0xFF, 0x00, 0xFF],
+                            [0x00, 0xFF, 0xFF, 0xFF],
+                            [0x00, 0x00, 0xFF, 0xFF],
+                            [0xFF, 0x00, 0xFF, 0xFF],
+                            [0xFF, 0x00, 0x00, 0xFF],
+                            [0xFF, 0xFF, 0x00, 0xFF],
+                            [0x00, 0xFF, 0x00, 0xFF],
+                            [0x00, 0xFF, 0xFF, 0xFF],
+                            [0x00, 0x00, 0xFF, 0xFF],
+                            [0xFF, 0x00, 0xFF, 0xFF],
+                            [0xFF, 0x00, 0x00, 0xFF],);
+
+                        const colorData = new Uint8Array(gradient.flat());
+
+                        const colorTexture = gl.createTexture();
+                        gl.bindTexture(gl.TEXTURE_2D, colorTexture);
+                        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+                        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+                        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+                        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, colorData.length / 4, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, colorData);
+                    });
+                }
+
+                draw();
+            });
+
+            function linearGradient(start, finish, steps) {
+                const diffs = start.map((x, i) => finish[i] - x);
+                steps = steps ?? Math.max(...diffs.map(x => Math.abs(x)));
+                return [...new Array(steps + 1)].map((_, i, a) => diffs.map((d, j) => start[j] + (i / (a.length - 1)) * d));
+            }
+
+            function complexGradient(...stages) {
+                const full = [];
+                for(let i = 0; i < stages.length - 1; i++) {
+                    const cur = linearGradient(stages[i], stages[i+1]);
+                    full.push(...(i === 0 ? cur : cur.slice(1)));
+                }
+                return full;
+            }
+        </script>
+    </head>
+    <body>
+        <canvas width="1200" height="1200" style="border: 1px solid black; cursor: zoom-in;"></canvas>
+    </body>
+</html>
