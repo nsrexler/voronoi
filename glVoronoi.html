@@ -267,6 +267,8 @@
                 vec4 color;
                 for(int i = 0; i < pointCount; i++) {
                     float distance = distance(getPoint(float(i)), gl_FragCoord.xy);
+                    //vec2 d = abs(getPoint(float(i)) - gl_FragCoord.xy);
+                    //float distance = d.x + d.y;
                     if(closestPoint == -1 || closestDistance > distance) {
                         closestPoint = i;
                         closestDistance = distance;
