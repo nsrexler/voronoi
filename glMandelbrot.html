@@ -23,8 +23,6 @@
                 let juliaX = 0;
                 let juliaY = 0;
 
-                let shaderHandle = null;
-
                 if(location.hash) {
                     const hashParams = new URLSearchParams(location.hash.slice(1));
                     originX = Number(hashParams.get("originX") ?? originX);
@@ -47,15 +45,15 @@
                     originY = Math.min(Math.max(y - (newWidth / 2.0), originY), originY + viewWidth - newWidth);
                     viewWidth = newWidth;
                     setHash();
-                    redraw();
+                    draw();
                 });
 
                 document.querySelector("button.resetView").addEventListener("click", () => {
                     originX = -2.0;
                     originY = -2.0;
                     viewWidth = 4.0;
-                    location.hash = "";
-                    redraw();
+                    setHash();
+                    draw();
                 });
 
                 const juliaBtn = document.querySelector("button.pickJulia");
@@ -77,7 +75,18 @@
                 }
 
                 function setHash() {
-                    location.hash = `originX=${originX}&originY=${originY}&viewWidth=${viewWidth}`;
+                    const hashParams = new URLSearchParams();
+                    if(juliaMode) {
+                        hashParams.set("juliaMode", juliaMode);
+                        hashParams.set("x", juliaX);
+                        hashParams.set("y", juliaY);
+                    }
+                    if(viewWidth !== 4.0){
+                        hashParams.set("originX", originX);
+                        hashParams.set("originY", originY);
+                        hashParams.set("viewWidth", viewWidth);
+                    }
+                    location.hash = hashParams.toString();
                 }
 
                 function getRealCoords(evt) {
@@ -90,7 +99,7 @@
                 function draw() {
                     const fsSource = `
                         precision highp float;
-                        const int iterations = 1000;
+                        const int iterations = 10000;
                         const float colorBandwidth = 600.0;
                         uniform bool juliaMode;
                         uniform vec2 juliaCoord;
@@ -130,7 +139,7 @@
                         }
                     `;
 
-                    shaderHandle = draw2DShader(gl, fsSource, (shaderProgram) => {
+                    draw2DShader(gl, fsSource, (shaderProgram) => {
                         gl.uniform2f(gl.getUniformLocation(shaderProgram, "resolution"), canvas.width, canvas.height);
                         gl.uniform2f(gl.getUniformLocation(shaderProgram, "origin"), originX, originY);
                         gl.uniform1f(gl.getUniformLocation(shaderProgram, "viewWidth"), viewWidth);
@@ -155,18 +164,6 @@
                         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
                         gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, colorData.length / 4, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, colorData);
                     });
-                }
-
-                function redraw() {
-                    if(shaderHandle) {
-                        shaderHandle.redraw((shaderProgram) => {
-                            gl.uniform2f(gl.getUniformLocation(shaderProgram, "origin"), originX, originY);
-                            gl.uniform1f(gl.getUniformLocation(shaderProgram, "viewWidth"), viewWidth);
-                        });
-                    }
-                    else {
-                        draw();
-                    }
                 }
 
                 draw();
