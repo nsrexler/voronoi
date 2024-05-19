@@ -4,6 +4,8 @@
         <title>WebGL Mandelbrot</title>
         <script type="text/javascript" src="2dshader.js"></script>
         <script type="text/javascript">
+            "use strict";
+
             window.addEventListener("load", () => {
                 const canvas = document.querySelector("canvas");
                 if (window.devicePixelRatio !== 1) {
@@ -12,8 +14,6 @@
                     canvas.width *= window.devicePixelRatio;
                     canvas.height *= window.devicePixelRatio;
                 }
-
-                const gl = canvas.getContext("webgl");
 
                 let originX = -2.0;
                 let originY = -2.0;
@@ -58,16 +58,37 @@
 
                 const juliaBtn = document.querySelector("button.pickJulia");
                 if(!juliaMode) {
+                    const juliaPreview = document.querySelector("canvas.juliaPreview");
+                    if (window.devicePixelRatio !== 1) {
+                        juliaPreview.style.width = juliaPreview.width + "px";
+                        juliaPreview.style.height = juliaPreview.height + "px";
+                        juliaPreview.width *= window.devicePixelRatio;
+                        juliaPreview.height *= window.devicePixelRatio;
+                    }
+                    const prev = canvas.style.cursor;
                     document.querySelector("button.pickJulia").addEventListener("click", () => {
                         pickMode = true;
-                        const prev = canvas.style.cursor;
                         canvas.style.cursor = "crosshair";
-                        canvas.addEventListener("click", (evt) => {
-                            const {x, y} = getRealCoords(evt);
-                            pickMode = false;
-                            canvas.style.cursor = prev;
-                            window.open(`#juliaMode=true&x=${x}&y=${y}`);
-                        }, {once: true})
+                        juliaPreview.hidden = false;
+                    });
+                    canvas.addEventListener("click", (evt) => {
+                        if(!pickMode) return;
+                        const {x, y} = getRealCoords(evt);
+                        pickMode = false;
+                        juliaPreview.hidden = true;
+                        canvas.style.cursor = prev;
+                        window.open(`#juliaMode=true&x=${x}&y=${y}`);
+                    });
+                    document.addEventListener("keydown", (evt) => {
+                        if(!pickMode || evt.key !== "Escape") return;
+                        pickMode = false;
+                        juliaPreview.hidden = true;
+                        canvas.style.cursor = prev;
+                    });
+                    canvas.addEventListener("mousemove", (evt) => {
+                        if(!pickMode) return;
+                        const {x, y} = getRealCoords(evt);
+                        drawFractal(juliaPreview, -2, -2, 4, true, x, y);
                     });
                 }
                 else {
@@ -97,77 +118,83 @@
                 }
 
                 function draw() {
-                    const fsSource = `
-                        precision highp float;
-                        const int iterations = 10000;
-                        const float colorBandwidth = 600.0;
-                        uniform bool juliaMode;
-                        uniform vec2 juliaCoord;
-                        uniform vec2 resolution;
-                        uniform vec2 origin;
-                        uniform highp float viewWidth;
-                        uniform sampler2D colorMap;
-
-                        vec4 getColor(int index) {
-                            float colorIndex = mod(float(index), colorBandwidth) / colorBandwidth;
-                            vec2 uv = vec2(colorIndex, 0.5);
-                            return texture2D(colorMap, uv);
-                        }
-
-                        void main() {
-                            // Calculate relative coordinates (uv)
-                            vec2 trans = gl_FragCoord.xy;
-                            trans.y = resolution.y - trans.y;
-                            vec2 uv = ((trans / resolution) * viewWidth) + origin;
-
-                            vec2 z, c;
-                            if(juliaMode) {
-                                z = uv;
-                                c = juliaCoord;
-                            }
-                            else {
-                                z = vec2(0.0, 0.0);
-                                c = uv;
-                            }
-                            gl_FragColor = vec4(0.0, 0.0, 0.0, 1.0);
-                            for(int i = 0; i < iterations; i++){
-                                z = vec2((z.x * z.x) - (z.y * z.y), 2.0 * z.x * z.y) + c;
-                                if(length(z) > 2.0){
-                                    gl_FragColor = getColor(i);
-                                }
-                            }
-                        }
-                    `;
-
-                    draw2DShader(gl, fsSource, (shaderProgram) => {
-                        gl.uniform2f(gl.getUniformLocation(shaderProgram, "resolution"), canvas.width, canvas.height);
-                        gl.uniform2f(gl.getUniformLocation(shaderProgram, "origin"), originX, originY);
-                        gl.uniform1f(gl.getUniformLocation(shaderProgram, "viewWidth"), viewWidth);
-                        gl.uniform1i(gl.getUniformLocation(shaderProgram, "juliaMode"), juliaMode);
-                        gl.uniform2f(gl.getUniformLocation(shaderProgram, "juliaCoord"), juliaX, juliaY);
-
-                        const gradient = complexGradient(
-                            [0xFF, 0x00, 0x00, 0xFF],
-                            [0xFF, 0xFF, 0x00, 0xFF],
-                            [0x00, 0xFF, 0x00, 0xFF],
-                            [0x00, 0xFF, 0xFF, 0xFF],
-                            [0x00, 0x00, 0xFF, 0xFF],
-                            [0xFF, 0x00, 0xFF, 0xFF],
-                            [0xFF, 0x00, 0x00, 0xFF],);
-
-                        const colorData = new Uint8Array(gradient.flat());
-
-                        const colorTexture = gl.createTexture();
-                        gl.bindTexture(gl.TEXTURE_2D, colorTexture);
-                        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-                        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-                        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-                        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, colorData.length / 4, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, colorData);
-                    });
+                    drawFractal(canvas, originX, originY, viewWidth, juliaMode, juliaX, juliaY);
                 }
 
                 draw();
             });
+
+            function drawFractal(canvas, originX, originY, viewWidth, juliaMode, juliaX, juliaY) {
+                const gl = canvas.getContext("webgl");
+
+                const fsSource = `
+                    precision highp float;
+                    const int iterations = 1000;
+                    const float colorBandwidth = 600.0;
+                    uniform bool juliaMode;
+                    uniform vec2 juliaCoord;
+                    uniform vec2 resolution;
+                    uniform vec2 origin;
+                    uniform highp float viewWidth;
+                    uniform sampler2D colorMap;
+
+                    vec4 getColor(int index) {
+                        float colorIndex = mod(float(index), colorBandwidth) / colorBandwidth;
+                        vec2 uv = vec2(colorIndex, 0.5);
+                        return texture2D(colorMap, uv);
+                    }
+
+                    void main() {
+                        // Calculate relative coordinates (uv)
+                        vec2 trans = gl_FragCoord.xy;
+                        trans.y = resolution.y - trans.y;
+                        vec2 uv = ((trans / resolution) * viewWidth) + origin;
+
+                        vec2 z, c;
+                        if(juliaMode) {
+                            z = uv;
+                            c = juliaCoord;
+                        }
+                        else {
+                            z = vec2(0.0, 0.0);
+                            c = uv;
+                        }
+                        gl_FragColor = vec4(0.0, 0.0, 0.0, 1.0);
+                        for(int i = 0; i < iterations; i++){
+                            z = vec2((z.x * z.x) - (z.y * z.y), 2.0 * z.x * z.y) + c;
+                            if(length(z) > 2.0){
+                                gl_FragColor = getColor(i);
+                            }
+                        }
+                    }
+                `;
+
+                draw2DShader(gl, fsSource, (shaderProgram) => {
+                    gl.uniform2f(gl.getUniformLocation(shaderProgram, "resolution"), canvas.width, canvas.height);
+                    gl.uniform2f(gl.getUniformLocation(shaderProgram, "origin"), originX, originY);
+                    gl.uniform1f(gl.getUniformLocation(shaderProgram, "viewWidth"), viewWidth);
+                    gl.uniform1i(gl.getUniformLocation(shaderProgram, "juliaMode"), juliaMode);
+                    gl.uniform2f(gl.getUniformLocation(shaderProgram, "juliaCoord"), juliaX, juliaY);
+
+                    const gradient = complexGradient(
+                        [0xFF, 0x00, 0x00, 0xFF],
+                        [0xFF, 0xFF, 0x00, 0xFF],
+                        [0x00, 0xFF, 0x00, 0xFF],
+                        [0x00, 0xFF, 0xFF, 0xFF],
+                        [0x00, 0x00, 0xFF, 0xFF],
+                        [0xFF, 0x00, 0xFF, 0xFF],
+                        [0xFF, 0x00, 0x00, 0xFF],);
+
+                    const colorData = new Uint8Array(gradient.flat());
+
+                    const colorTexture = gl.createTexture();
+                    gl.bindTexture(gl.TEXTURE_2D, colorTexture);
+                    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+                    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+                    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+                    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, colorData.length / 4, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, colorData);
+                });
+            }
 
             function linearGradient(start, finish, steps) {
                 const diffs = start.map((x, i) => finish[i] - x);
@@ -187,6 +214,7 @@
     </head>
     <body>
         <canvas width="1200" height="1200" style="border: 1px solid black; cursor: zoom-in;"></canvas>
+        <canvas class="juliaPreview" hidden width="500" height="500" style="border: 1px solid black"></canvas>
         <div class="controls">
             <button class="resetView">Reset Zoom</button>
             <button class="pickJulia">Pick Julia</button>
