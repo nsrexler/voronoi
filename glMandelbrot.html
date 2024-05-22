@@ -119,7 +119,7 @@
                 }
 
                 function draw() {
-                    drawFractal(canvas, originX, originY, viewWidth, juliaMode, juliaX, juliaY);
+                    drawFractalParallel(canvas, originX, originY, viewWidth, juliaMode, juliaX, juliaY);
                 }
 
                 draw();
@@ -272,55 +272,27 @@
                         applyColorToImage(c, r, iterate(x, y, juliaMode, juliaX, juliaY));
                     }
                 }
-                console.log(imgData.data.slice(0, 4));
                 ctx.putImageData(imgData, 0, 0);
                 const elapsed = (new Date()) - startTime;
                 console.log(`${elapsed / 1000}s`);
             }
 
-            const workers = initWorkers(workerFn, [getColor, iterate], {iterations, colorBandwidth, gradient});
-
-            function workerFn(start, end, width, originX, originY, viewWidth, juliaMode, juliaX, juliaY) {
-                const colorData = [];
+            function mandelbrotPixel(r, c, width, originX, originY, viewWidth, juliaMode, juliaX, juliaY) {
                 const scaleFactor = viewWidth / width;
-                for(let r = start; r < end; r++) {
-                    const colorRow = [];
-                    const y = r * scaleFactor + originY;
-                    for(let c = 0; c < width; c++) {
-                        const x = c * scaleFactor + originX;
-                        colorRow.push(iterate(x, y, juliaMode, juliaX, juliaY));
-                    }
-                    colorData.push(colorRow);
-                }
-                return colorData;
+                const y = r * scaleFactor + originY;
+                const x = c * scaleFactor + originX;
+                return iterate(x, y, juliaMode, juliaX, juliaY);
             }
+
+            const workers = initPixelWorkers(mandelbrotPixel, [getColor, iterate], {iterations, colorBandwidth, gradient})
 
             async function drawFractalParallel(canvas, originX, originY, viewWidth, juliaMode, juliaX, juliaY) {
                 const startTime = new Date();
 
                 const ctx = canvas.getContext("2d");
-                const imgData = ctx.createImageData(canvas.width, canvas.height);
-                function applyColorToImage(x, y, color) {
-                    const i = 4 * (y * canvas.width + x);
-                    imgData.data[i] = color[0];
-                    imgData.data[i + 1] = color[1];
-                    imgData.data[i + 2] = color[2];
-                    imgData.data[i + 3] = 255;
-                }
-                const chunkSize = Math.ceil(canvas.height / workers.length);
-                await Promise.all(workers.map((worker, i) => {
-                    const start = i * chunkSize;
-                    const end = Math.min(start + chunkSize, canvas.height);
-                    return worker.runAsync({ start, end, width: canvas.width, originX, originY, viewWidth, juliaMode, juliaX, juliaY })
-                        .then(colorData => {
-                            for (let y = 0; y < colorData.length; y++) {
-                                for (let x = 0; x < canvas.width; x++) {
-                                    applyColorToImage(x, y + start, colorData[y][x]);
-                                }
-                            }
-                        });
-                }));
+                const imgData = await runPixelWorkers(workers, canvas.width, canvas.height, {originX, originY, viewWidth, juliaMode, juliaX, juliaY});
                 ctx.putImageData(imgData, 0, 0);
+
                 const elapsed = (new Date()) - startTime;
                 console.log(`${elapsed / 1000}s`);
             }
