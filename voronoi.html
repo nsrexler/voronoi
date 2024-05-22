@@ -234,14 +234,14 @@
     }
 
     function voronoiPixel(y, x, width, points) {
-      return findClosestPoint(points, x, y).colorArray;
+      return [...findClosestPoint(points, x, y).colorArray, 0xFF];
     }
 
     const workers = initPixelWorkers(voronoiPixel, [findClosestPoint, sqDistanceTo]);
 
     async function fillAreasParallel() {
       const startTime = new Date();
-      const imgData = runPixelWorkers(workers, canvas.width, canvas.height, {points: this.points});
+      const imgData = await runPixelWorkers(workers, this.width, this.height, {points: this.points});
       this.ctx.putImageData(imgData, 0, 0);
       if (!this.image) this.drawPoints();
       this.isDrawn = true;
