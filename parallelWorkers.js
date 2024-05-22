@@ -46,37 +46,27 @@ Object.defineProperty(Function.prototype, "params", {
 });
 
 function pixelWorkerFn(start, end, width, ...childParams) {
-    const colorData = [];
+    const colorData = new Uint8ClampedArray(4 * (end - start) * width);
     for(let y = start; y < end; y++) {
-        const colorRow = [];
         for(let x = 0; x < width; x++) {
-            colorRow.push(pixelFn(y, x, width, ...childParams));
+            const color = pixelFn(y, x, width, ...childParams);
+            const offset = 4 * ((y - start) * width + x);
+            colorData.set(color, offset);
         }
-        colorData.push(colorRow);
     }
     return colorData;
 }
 
 async function runPixelWorkers(workers, width, height, workerParams) {
     const imgData = new ImageData(width, height);
-    function applyColorToImage(x, y, color) {
-        const i = 4 * (y * width + x);
-        imgData.data[i] = color[0];
-        imgData.data[i + 1] = color[1];
-        imgData.data[i + 2] = color[2];
-        imgData.data[i + 3] = 255;
-    }
     const chunkSize = Math.ceil(height / workers.length);
     await Promise.all(workers.map((worker, i) => {
         const start = i * chunkSize;
         const end = Math.min(start + chunkSize, height);
         return worker.runAsync({ start, end, width, ...workerParams })
             .then(colorData => {
-                for (let y = 0; y < colorData.length; y++) {
-                    for (let x = 0; x < width; x++) {
-                        applyColorToImage(x, y + start, colorData[y][x]);
-                    }
-                }
+                const offset = 4 * start * width;
+                imgData.data.set(colorData, offset);
             });
     }));
     return imgData;
