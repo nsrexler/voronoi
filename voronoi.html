@@ -233,37 +233,15 @@
       console.log(`${elapsed / 1000}s`);
     }
 
-    const workers = initWorkers(workerFn, [findClosestPoint, sqDistanceTo]);
-
-    function workerFn(start, end, width, points) {
-      const colorData = [];
-      for (let y = start; y < end; y++) {
-        const colorRow = [];
-        for (let x = 0; x < width; x++) {
-          const closestPoint = findClosestPoint(points, x, y);
-          colorRow.push(closestPoint.colorArray);
-        }
-        colorData.push(colorRow);
-      }
-      return colorData;
+    function voronoiPixel(y, x, width, points) {
+      return findClosestPoint(points, x, y).colorArray;
     }
+
+    const workers = initPixelWorkers(voronoiPixel, [findClosestPoint, sqDistanceTo]);
 
     async function fillAreasParallel() {
       const startTime = new Date();
-      const imgData = this.ctx.createImageData(this.width, this.height);
-      const chunkSize = Math.ceil(this.height / workers.length);
-      await Promise.all(workers.map((worker, i) => {
-        const start = i * chunkSize;
-        const end = Math.min(start + chunkSize, this.height);
-        return worker.runAsync({ start, end, width: this.width, points: this.points })
-          .then(colorData => {
-            for (let y = 0; y < colorData.length; y++) {
-              for (let x = 0; x < this.width; x++) {
-                applyColorToImage(imgData, this.width, x, y + start, colorData[y][x]);
-              }
-            }
-          });
-      }));
+      const imgData = runPixelWorkers(workers, canvas.width, canvas.height, {points: this.points});
       this.ctx.putImageData(imgData, 0, 0);
       if (!this.image) this.drawPoints();
       this.isDrawn = true;
