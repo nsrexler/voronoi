@@ -7,13 +7,15 @@
         <script type="text/javascript">
             "use strict";
 
+            const SCALING_FACTOR = window.devicePixelRatio * 4;
+
             window.addEventListener("load", () => {
                 const canvas = document.querySelector("canvas");
-                if (window.devicePixelRatio !== 1) {
+                if (SCALING_FACTOR !== 1) {
                     canvas.style.width = canvas.width + "px";
                     canvas.style.height = canvas.height + "px";
-                    canvas.width *= window.devicePixelRatio;
-                    canvas.height *= window.devicePixelRatio;
+                    canvas.width *= SCALING_FACTOR;
+                    canvas.height *= SCALING_FACTOR;
                 }
 
                 let originX = -2.0;
@@ -60,11 +62,11 @@
                 const juliaBtn = document.querySelector("button.pickJulia");
                 if(!juliaMode) {
                     const juliaPreview = document.querySelector("canvas.juliaPreview");
-                    if (window.devicePixelRatio !== 1) {
+                    if (SCALING_FACTOR !== 1) {
                         juliaPreview.style.width = juliaPreview.width + "px";
                         juliaPreview.style.height = juliaPreview.height + "px";
-                        juliaPreview.width *= window.devicePixelRatio;
-                        juliaPreview.height *= window.devicePixelRatio;
+                        juliaPreview.width *= SCALING_FACTOR;
+                        juliaPreview.height *= SCALING_FACTOR;
                     }
                     const prev = canvas.style.cursor;
                     document.querySelector("button.pickJulia").addEventListener("click", () => {
@@ -113,8 +115,8 @@
 
                 function getRealCoords(evt) {
                     const rect = canvas.getBoundingClientRect();
-                    const x = ((evt.clientX - rect.left) * window.devicePixelRatio / canvas.width) * viewWidth + originX;
-                    const y = ((evt.clientY - rect.top) * window.devicePixelRatio / canvas.height) * viewWidth + originY;
+                    const x = ((evt.clientX - rect.left) * SCALING_FACTOR / canvas.width) * viewWidth + originX;
+                    const y = ((evt.clientY - rect.top) * SCALING_FACTOR / canvas.height) * viewWidth + originY;
                     return {x, y};
                 }
 
@@ -125,7 +127,7 @@
                 draw();
             });
 
-            const iterations = 1000;
+            const iterations = 10000;
             const colorBandwidth = 600;
 
             const gradient = complexGradient(
@@ -284,13 +286,13 @@
                 return iterate(x, y, juliaMode, juliaX, juliaY);
             }
 
-            const workers = initPixelWorkers(mandelbrotPixel, [getColor, iterate], {iterations, colorBandwidth, gradient})
+            const runPixelWorkers = initPixelWorkersInterlaced(mandelbrotPixel, [getColor, iterate], {iterations, colorBandwidth, gradient})
 
             async function drawFractalParallel(canvas, originX, originY, viewWidth, juliaMode, juliaX, juliaY) {
                 const startTime = new Date();
 
                 const ctx = canvas.getContext("2d");
-                const imgData = await runPixelWorkers(workers, canvas.width, canvas.height, {originX, originY, viewWidth, juliaMode, juliaX, juliaY});
+                const imgData = await runPixelWorkers(canvas.width, canvas.height, {originX, originY, viewWidth, juliaMode, juliaX, juliaY});
                 ctx.putImageData(imgData, 0, 0);
 
                 const elapsed = (new Date()) - startTime;
