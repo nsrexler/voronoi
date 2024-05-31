@@ -17,8 +17,9 @@
       vor.canvas.clearAll = clearAll;
       vor.canvas.drawPoints = drawPoints;
       //vor.canvas.fillAreas = fillAreasBrute;
-      vor.canvas.fillAreas = fillAreasGrid;
-      //vor.canvas.fillAreas = fillAreasParallel;
+      //vor.canvas.fillAreas = fillAreasGrid;
+      //vor.canvas.fillAreas = fillAreasBruteParallel;
+      vor.canvas.fillAreas = fillAreasGridParallel;
       vor.pointCount = vor.querySelector(".pointCount");
       vor.canvas.addEventListener("click", addPoint);
       vor.canvas.addEventListener("dragover", function (evt) {
@@ -346,12 +347,98 @@
 
     const runPixelWorkers = initPixelWorkers(voronoiPixel, [findClosestPoint, sqDistanceTo]);
 
-    async function fillAreasParallel() {
+    async function fillAreasBruteParallel() {
       const startTime = new Date();
       const imgData = await runPixelWorkers(this.width, this.height, {points: this.points});
       this.ctx.putImageData(imgData, 0, 0);
       if (!this.image) this.drawPoints();
       this.isDrawn = true;
+      const elapsed = (new Date()) - startTime;
+      console.log(`${elapsed / 1000}s`);
+    }
+
+    function gridWorker(startY, startX, height, width, points) {
+      const pixelMap = [...Array(height)].map((_, y) => [...Array(width)].map((_, x) => ({y, x, point: undefined})));
+
+      function fillSquare(y, x, height, width, point) {
+        for(let row = y; row < y + height; row++) {
+          for(let col = x; col < x + width; col++) {
+            pixelMap[row][col].point = point;
+          }
+        }
+      }
+
+      function evaluateCorners(y, x, height, width) {
+        const a = pixelMap[y][x];
+        const b = pixelMap[y][x + width - 1];
+        const c = pixelMap[y + height - 1][x];
+        const d = pixelMap[y + height - 1][x + width - 1];
+        [a,b,c,d].forEach(corner => {
+          if(!corner.point) {
+            corner.point = findClosestPoint(points, corner.x + startX, corner.y + startY);
+          }
+        });
+
+        if(a.point === b.point && b.point === c.point && c.point === d.point) {
+          fillSquare(y, x, height, width, a.point);
+        }
+        else {
+          if(a.point === b.point) {
+            fillSquare(a.y, a.x, 1, width, a.point);
+          }
+          if(b.point === d.point) {
+            fillSquare(b.y, b.x, height, 1, b.point);
+          }
+          if(c.point === d.point) {
+            fillSquare(c.y, c.x, 1, width, c.point);
+          }
+          if(a.point === c.point) {
+            fillSquare(a.y, a.x, height, 1, a.point);
+          }
+          evaluateCorners(y, x, Math.floor(height / 2) || 1, Math.floor(width / 2) || 1);
+          evaluateCorners(y, x + Math.floor(width / 2), Math.floor(height / 2) || 1, Math.ceil(width / 2));
+          evaluateCorners(y + Math.floor(height / 2), x, Math.ceil(height / 2), Math.floor(width / 2) || 1);
+          evaluateCorners(y + Math.floor(height / 2), x + Math.floor(width / 2), Math.ceil(height / 2), Math.ceil(width / 2));
+        }
+      }
+
+      evaluateCorners(0, 0, height, width);
+
+      const imgData = new ImageData(width, height);
+      for (let y = 0; y < height; y++) {
+        for (let x = 0; x < width; x++) {
+          const closestPoint = pixelMap[y][x].point;
+          applyColorToImage(imgData, width, x, y, closestPoint?.colorArray ?? [0xFF, 0xFF, 0xFF]);
+        }
+      }
+      return imgData;
+    }
+
+    const gridWidth = 4;
+    const gridHeight = 4;
+    const gridWorkers = initWorkers(gridWorker, [findClosestPoint, sqDistanceTo, applyColorToImage], undefined, gridHeight * gridWidth);
+
+    async function fillAreasGridParallel() {
+      const startTime = new Date();
+
+      const imgData = this.ctx.createImageData(this.width, this.height);
+      const chunkWidth = this.width / gridWidth;
+      const chunkHeight = this.height / gridHeight;
+      await Promise.all(gridWorkers.map((worker, i) => {
+        const startY = Math.floor(i / gridWidth) * chunkHeight;
+        const startX = (i % gridWidth) * chunkWidth;
+        return worker.runAsync({startY, startX, height: chunkHeight, width: chunkWidth, points: this.points})
+          .then(chunkImg => {
+            for(let y = 0; y < chunkHeight; y++) {
+              imgData.data.set(chunkImg.data.slice(4 * y * chunkWidth, 4 * (y + 1) * chunkWidth), 4 * ((y + startY) * this.width + startX));
+            }
+          })
+      }));
+      this.ctx.putImageData(imgData, 0, 0);
+
+      if (!this.image) this.drawPoints();
+      this.isDrawn = true;
+
       const elapsed = (new Date()) - startTime;
       console.log(`${elapsed / 1000}s`);
     }
