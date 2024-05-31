@@ -16,7 +16,7 @@
       vor.canvas.getPoint = getPoint;
       vor.canvas.clearAll = clearAll;
       vor.canvas.drawPoints = drawPoints;
-      vor.canvas.fillAreas = fillAreasParallel;
+      vor.canvas.fillAreas = fillAreasGrid;
       vor.pointCount = vor.querySelector(".pointCount");
       vor.canvas.addEventListener("click", addPoint);
       vor.canvas.addEventListener("dragover", function (evt) {
@@ -233,15 +233,80 @@
       console.log(`${elapsed / 1000}s`);
     }
 
+    function fillAreasGrid() {
+      const startTime = new Date();
+
+      const pixelMap = [...Array(this.height)].map((_, y) => [...Array(this.width)].map((_, x) => ({y, x, point: undefined})));
+      const points = this.points;
+
+      function fillSquare(y, x, height, width, point) {
+        for(let row = y; row < y + height; row++) {
+          for(let col = x; col < x + width; col++) {
+            pixelMap[row][col].point = point;
+          }
+        }
+      }
+
+      function evaluateCorners(y, x, height, width) {
+        const a = pixelMap[y][x];
+        const b = pixelMap[y][x + width - 1];
+        const c = pixelMap[y + height - 1][x];
+        const d = pixelMap[y + height - 1][x + width - 1];
+        [a,b,c,d].forEach(corner => {
+          if(!corner.point) {
+            corner.point = findClosestPoint(points, corner.x, corner.y);
+          }
+        });
+
+        if(a.point === b.point && b.point === c.point && c.point === d.point) {
+          fillSquare(y, x, height, width, a.point);
+        }
+        else {
+          if(a.point === b.point) {
+            fillSquare(a.y, a.x, 1, width, a.point);
+          }
+          if(b.point === d.point) {
+            fillSquare(b.y, b.x, height, 1, b.point);
+          }
+          if(c.point === d.point) {
+            fillSquare(c.y, c.x, 1, width, c.point);
+          }
+          if(a.point === c.point) {
+            fillSquare(a.y, a.x, height, 1, a.point);
+          }
+          evaluateCorners(y, x, Math.floor(height / 2) || 1, Math.floor(width / 2) || 1);
+          evaluateCorners(y, x + Math.floor(width / 2), Math.floor(height / 2) || 1, Math.ceil(width / 2));
+          evaluateCorners(y + Math.floor(height / 2), x, Math.ceil(height / 2), Math.floor(width / 2) || 1);
+          evaluateCorners(y + Math.floor(height / 2), x + Math.floor(width / 2), Math.ceil(height / 2), Math.ceil(width / 2));
+        }
+      }
+
+      evaluateCorners(0, 0, this.height, this.width);
+
+      const imgData = this.ctx.createImageData(this.width, this.height);
+      for (let y = 0; y < this.height; y++) {
+        for (let x = 0; x < this.width; x++) {
+          const closestPoint = pixelMap[y][x].point;
+          applyColorToImage(imgData, this.width, x, y, closestPoint.colorArray);
+        }
+      }
+      this.ctx.putImageData(imgData, 0, 0);
+      if (!this.image) this.drawPoints();
+      this.isDrawn = true;
+
+      const elapsed = (new Date()) - startTime;
+      console.log(`${elapsed / 1000}s`);
+    }
+
     function voronoiPixel(y, x, width, points) {
       return [...findClosestPoint(points, x, y).colorArray, 0xFF];
     }
 
-    const workers = initPixelWorkers(voronoiPixel, [findClosestPoint, sqDistanceTo]);
+    const runPixelWorkers = initPixelWorkers(voronoiPixel, [findClosestPoint, sqDistanceTo]);
 
     async function fillAreasParallel() {
       const startTime = new Date();
-      const imgData = await runPixelWorkers(workers, this.width, this.height, {points: this.points});
+      const imgData = await runPixelWorkers(this.width, this.height, {points: this.points});
       this.ctx.putImageData(imgData, 0, 0);
       if (!this.image) this.drawPoints();
       this.isDrawn = true;
