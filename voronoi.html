@@ -16,7 +16,9 @@
       vor.canvas.getPoint = getPoint;
       vor.canvas.clearAll = clearAll;
       vor.canvas.drawPoints = drawPoints;
+      //vor.canvas.fillAreas = fillAreasBrute;
       vor.canvas.fillAreas = fillAreasGrid;
+      //vor.canvas.fillAreas = fillAreasParallel;
       vor.pointCount = vor.querySelector(".pointCount");
       vor.canvas.addEventListener("click", addPoint);
       vor.canvas.addEventListener("dragover", function (evt) {
@@ -247,6 +249,26 @@
         }
       }
 
+      function fillTriangle(a, b, c, point) {
+        const ystart = a.y;
+        const yend = Math.max(b.y, c.y);
+        let xstart, xend;
+        if(a.y === b.y) {
+          xstart = b.x;
+          xend = c.x;
+        }
+        else {
+          xstart = a.x;
+          xend = b.x;
+        }
+        for(let y = ystart; y <= yend; y++) {
+          const n = invlerp(ystart, yend, y);
+          for(let x = Math.floor(lerp(a.x, xend, n)); x <= lerp(xstart, c.x, n); x++) {
+            pixelMap[y][x].point = point;
+          }
+        }
+      }
+
       function evaluateCorners(y, x, height, width) {
         const a = pixelMap[y][x];
         const b = pixelMap[y][x + width - 1];
@@ -263,16 +285,36 @@
         }
         else {
           if(a.point === b.point) {
-            fillSquare(a.y, a.x, 1, width, a.point);
+            if(b.point === c.point) {
+              fillTriangle(a, b, c, a.point);
+            }
+            else {
+              fillSquare(a.y, a.x, 1, width, a.point);
+            }
           }
           if(b.point === d.point) {
-            fillSquare(b.y, b.x, height, 1, b.point);
+            if(a.point === b.point) {
+              fillTriangle(a, b, d, a.point);
+            }
+            else {
+              fillSquare(b.y, b.x, height, 1, b.point);
+            }
           }
           if(c.point === d.point) {
-            fillSquare(c.y, c.x, 1, width, c.point);
+            if(b.point === c.point) {
+              fillTriangle(b, c, d, b.point);
+            }
+            else {
+              fillSquare(c.y, c.x, 1, width, c.point);
+            }
           }
           if(a.point === c.point) {
-            fillSquare(a.y, a.x, height, 1, a.point);
+            if(c.point === d.point) {
+              fillTriangle(a, c, d, a.point);
+            }
+            else {
+              fillSquare(a.y, a.x, height, 1, a.point);
+            }
           }
           evaluateCorners(y, x, Math.floor(height / 2) || 1, Math.floor(width / 2) || 1);
           evaluateCorners(y, x + Math.floor(width / 2), Math.floor(height / 2) || 1, Math.ceil(width / 2));
@@ -287,7 +329,7 @@
       for (let y = 0; y < this.height; y++) {
         for (let x = 0; x < this.width; x++) {
           const closestPoint = pixelMap[y][x].point;
-          applyColorToImage(imgData, this.width, x, y, closestPoint.colorArray);
+          applyColorToImage(imgData, this.width, x, y, closestPoint?.colorArray ?? [0xFF, 0xFF, 0xFF]);
         }
       }
       this.ctx.putImageData(imgData, 0, 0);
@@ -381,6 +423,11 @@
     function distanceTo(ax, ay, bx, by) {
       return Math.sqrt(sqDistanceTo(ax, ay, bx, by));
     }
+
+    function lerp(x, y, a) {return x * (1 - a) + y * a;}
+    function clamp(a, min = 0, max = 1) {return Math.min(max, Math.max(min, a));}
+    function invlerp(x, y, a) {return clamp((a - x) / (y - x));}
+    function range(x1, y1, x2, y2, a) {return lerp(x2, y2, invlerp(x1, y1, a));}
 
     function randomChannel() {
       return Math.floor(Math.random() * 0x100);
