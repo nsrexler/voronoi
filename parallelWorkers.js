@@ -6,12 +6,14 @@ Object.defineProperty(Function.prototype, "params", {
     }
 });
 
-function initWorkers(workerFn, fnsToInclude, constantsToInclude, workerParams) {
+console.log(`${navigator.hardwareConcurrency} workers available`);
+
+function initWorkers(workerFn, fnsToInclude, constantsToInclude, workerCount, workerParams) {
     fnsToInclude = [workerFn, ...(fnsToInclude ?? [])];
     constantsToInclude = constantsToInclude ?? {};
+    workerCount = workerCount ?? navigator.hardwareConcurrency;
     workerParams = workerParams ?? workerFn.params;
     const workers = [];
-    console.log(`${navigator.hardwareConcurrency} workers available`);
     let workerScript = `"use strict";\n`;
     workerScript = Object.entries(constantsToInclude).map(([key, value]) => `const ${key} = ${typeof value === "function" ? value.toString() : JSON.stringify(value)};\n`).join("");
     workerScript += fnsToInclude.map(fn => fn.toString()).join('\n') + '\n';
@@ -20,7 +22,7 @@ function initWorkers(workerFn, fnsToInclude, constantsToInclude, workerParams) {
         const result = ${workerFn.name}(${workerParams});
         postMessage([result]);}`;
     const blob = new Blob([workerScript], { type: 'text/javascript' });
-    for (let i = 0; i < navigator.hardwareConcurrency; i++) {
+    for (let i = 0; i < workerCount; i++) {
         const worker = new Worker(URL.createObjectURL(blob));
         worker.runAsync = function (data) {
             this.postMessage([data]);
@@ -44,7 +46,7 @@ function initPixelWorkers(pixelFn, fnsToInclude, constantsToInclude) {
         fnsToInclude = [pixelFn, ...(fnsToInclude ?? [])];
     }
     const workerParams = pixelWorkerFn.params.replace("...childParams", pixelFn.params.split(",").slice(3).join(","));
-    const workers = initWorkers(pixelWorkerFn, fnsToInclude, constantsToInclude, workerParams);
+    const workers = initWorkers(pixelWorkerFn, fnsToInclude, constantsToInclude, undefined, workerParams);
     return async (width, height, workerParams) => {
         const imgData = new ImageData(width, height);
         const chunkSize = Math.ceil(height / workers.length);
