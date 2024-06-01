@@ -249,26 +249,6 @@
         }
       }
 
-      function fillTriangle(a, b, c, point) {
-        const ystart = a.y;
-        const yend = Math.max(b.y, c.y);
-        let xstart, xend;
-        if(a.y === b.y) {
-          xstart = b.x;
-          xend = c.x;
-        }
-        else {
-          xstart = a.x;
-          xend = b.x;
-        }
-        for(let y = ystart; y <= yend; y++) {
-          const n = invlerp(ystart, yend, y);
-          for(let x = Math.floor(lerp(a.x, xend, n)); x <= lerp(xstart, c.x, n); x++) {
-            pixelMap[y][x].point = point;
-          }
-        }
-      }
-
       function findPoint(a, points) {
         if(!a.point) {
           a.point = findClosestPoint(points, a.x, a.y);
@@ -311,48 +291,28 @@
         }
         else {
           if(a.point === b.point) {
-            if(b.point === c.point) {
-              fillTriangle(a, b, c, a.point);
-            }
-            else {
-              fillSquare(a.y, a.x, 1, width, a.point);
-            }
+            fillSquare(a.y, a.x, 1, width, a.point);
             points = points.filter(p => p.y >= a.point.y);
           } else {
             const m = checkHorizLine(a, b, points, true);
             points = points.filter(p => p.y >= m);
           }
           if(b.point === d.point) {
-            if(a.point === b.point) {
-              fillTriangle(a, b, d, a.point);
-            }
-            else {
-              fillSquare(b.y, b.x, height, 1, b.point);
-            }
+            fillSquare(b.y, b.x, height, 1, b.point);
             points = points.filter(p => p.x <= b.point.x);
           } else {
             const m = checkVertLine(b, d, points, false);
             points = points.filter(p => p.x <= m);
           }
           if(c.point === d.point) {
-            if(b.point === c.point) {
-              fillTriangle(b, c, d, b.point);
-            }
-            else {
-              fillSquare(c.y, c.x, 1, width, c.point);
-            }
+            fillSquare(c.y, c.x, 1, width, c.point);
             points = points.filter(p => p.y <= c.point.y);
           } else {
             const m = checkHorizLine(c, d, points, false);
             points = points.filter(p => p.y <= m);
           }
           if(a.point === c.point) {
-            if(c.point === d.point) {
-              fillTriangle(a, c, d, a.point);
-            }
-            else {
-              fillSquare(a.y, a.x, height, 1, a.point);
-            }
+            fillSquare(a.y, a.x, height, 1, a.point);
             points = points.filter(p => p.x >= a.point.x);
           } else {
             const m = checkVertLine(a, c, points, true);
