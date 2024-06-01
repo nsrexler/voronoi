@@ -198,9 +198,14 @@
       const colorMap = {};
       const useAvg = this.image && document.getElementById("useAvg").checked;
       const imgData = this.ctx.createImageData(this.width, this.height);
+      let points = this.points;
       for (let y = 0; y < this.height; y++) {
+        let minY = y;
         for (let x = 0; x < this.width; x++) {
-          const closestPoint = findClosestPoint(this.points, x, y);
+          const closestPoint = findClosestPoint(points, x, y);
+          if(closestPoint.y < minY) {
+            minY = closestPoint.y;
+          }
 
           if (useAvg) {
             let pxList = colorMap[closestPoint];
@@ -212,6 +217,7 @@
           }
           else applyColorToImage(imgData, this.width, x, y, closestPoint.colorArray);
         }
+        points = points.filter(p => p.y >= minY);
       }
       if (useAvg) {
         const cWidth = this.width;
