@@ -240,7 +240,6 @@
       const startTime = new Date();
 
       const pixelMap = [...Array(this.height)].map((_, y) => [...Array(this.width)].map((_, x) => ({y, x, point: undefined})));
-      const points = this.points;
 
       function fillSquare(y, x, height, width, point) {
         for(let row = y; row < y + height; row++) {
@@ -270,7 +269,7 @@
         }
       }
 
-      function evaluateCorners(y, x, height, width) {
+      function evaluateCorners(y, x, height, width, points) {
         const a = pixelMap[y][x];
         const b = pixelMap[y][x + width - 1];
         const c = pixelMap[y + height - 1][x];
@@ -292,6 +291,7 @@
             else {
               fillSquare(a.y, a.x, 1, width, a.point);
             }
+            points = points.filter(p => p.y >= a.point.y);
           }
           if(b.point === d.point) {
             if(a.point === b.point) {
@@ -300,6 +300,7 @@
             else {
               fillSquare(b.y, b.x, height, 1, b.point);
             }
+            points = points.filter(p => p.x <= b.point.x);
           }
           if(c.point === d.point) {
             if(b.point === c.point) {
@@ -308,6 +309,7 @@
             else {
               fillSquare(c.y, c.x, 1, width, c.point);
             }
+            points = points.filter(p => p.y <= c.point.y);
           }
           if(a.point === c.point) {
             if(c.point === d.point) {
@@ -316,15 +318,16 @@
             else {
               fillSquare(a.y, a.x, height, 1, a.point);
             }
+            points = points.filter(p => p.x >= a.point.x);
           }
-          evaluateCorners(y, x, Math.floor(height / 2) || 1, Math.floor(width / 2) || 1);
-          evaluateCorners(y, x + Math.floor(width / 2), Math.floor(height / 2) || 1, Math.ceil(width / 2));
-          evaluateCorners(y + Math.floor(height / 2), x, Math.ceil(height / 2), Math.floor(width / 2) || 1);
-          evaluateCorners(y + Math.floor(height / 2), x + Math.floor(width / 2), Math.ceil(height / 2), Math.ceil(width / 2));
+          evaluateCorners(y, x, Math.floor(height / 2) || 1, Math.floor(width / 2) || 1, points);
+          evaluateCorners(y, x + Math.floor(width / 2), Math.floor(height / 2) || 1, Math.ceil(width / 2), points);
+          evaluateCorners(y + Math.floor(height / 2), x, Math.ceil(height / 2), Math.floor(width / 2) || 1, points);
+          evaluateCorners(y + Math.floor(height / 2), x + Math.floor(width / 2), Math.ceil(height / 2), Math.ceil(width / 2), points);
         }
       }
 
-      evaluateCorners(0, 0, this.height, this.width);
+      evaluateCorners(0, 0, this.height, this.width, this.points);
 
       const imgData = this.ctx.createImageData(this.width, this.height);
       for (let y = 0; y < this.height; y++) {
@@ -368,7 +371,7 @@
         }
       }
 
-      function evaluateCorners(y, x, height, width) {
+      function evaluateCorners(y, x, height, width, points) {
         const a = pixelMap[y][x];
         const b = pixelMap[y][x + width - 1];
         const c = pixelMap[y + height - 1][x];
@@ -385,24 +388,28 @@
         else {
           if(a.point === b.point) {
             fillSquare(a.y, a.x, 1, width, a.point);
+            points = points.filter(p => p.y >= a.point.y);
           }
           if(b.point === d.point) {
             fillSquare(b.y, b.x, height, 1, b.point);
+            points = points.filter(p => p.x <= b.point.x);
           }
           if(c.point === d.point) {
             fillSquare(c.y, c.x, 1, width, c.point);
+            points = points.filter(p => p.y <= c.point.y);
           }
           if(a.point === c.point) {
             fillSquare(a.y, a.x, height, 1, a.point);
+            points = points.filter(p => p.x >= a.point.x);
           }
-          evaluateCorners(y, x, Math.floor(height / 2) || 1, Math.floor(width / 2) || 1);
-          evaluateCorners(y, x + Math.floor(width / 2), Math.floor(height / 2) || 1, Math.ceil(width / 2));
-          evaluateCorners(y + Math.floor(height / 2), x, Math.ceil(height / 2), Math.floor(width / 2) || 1);
-          evaluateCorners(y + Math.floor(height / 2), x + Math.floor(width / 2), Math.ceil(height / 2), Math.ceil(width / 2));
+          evaluateCorners(y, x, Math.floor(height / 2) || 1, Math.floor(width / 2) || 1, points);
+          evaluateCorners(y, x + Math.floor(width / 2), Math.floor(height / 2) || 1, Math.ceil(width / 2), points);
+          evaluateCorners(y + Math.floor(height / 2), x, Math.ceil(height / 2), Math.floor(width / 2) || 1, points);
+          evaluateCorners(y + Math.floor(height / 2), x + Math.floor(width / 2), Math.ceil(height / 2), Math.ceil(width / 2), points);
         }
       }
 
-      evaluateCorners(0, 0, height, width);
+      evaluateCorners(0, 0, height, width, points);
 
       const imgData = new ImageData(width, height);
       for (let y = 0; y < height; y++) {
