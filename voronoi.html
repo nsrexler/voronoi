@@ -287,42 +287,42 @@
       const outerHeight = height;
 
       function evaluateCorners(y, x, height, width, points) {
-        const a = pixelMap[y][x];
-        const b = pixelMap[y][x + width - 1];
-        const c = pixelMap[y + height - 1][x];
-        const d = pixelMap[y + height - 1][x + width - 1];
-        [a,b,c,d].forEach(corner => findPoint(corner, points));
+        const nw = pixelMap[y][x];
+        const ne = pixelMap[y][x + width - 1];
+        const sw = pixelMap[y + height - 1][x];
+        const se = pixelMap[y + height - 1][x + width - 1];
+        [nw,ne,sw,se].forEach(corner => findPoint(corner, points));
 
-        if(a.point === b.point && b.point === c.point && c.point === d.point) {
-          fillSquare(y, x, height, width, a.point);
+        if(nw.point === ne.point && ne.point === sw.point && sw.point === se.point) {
+          fillSquare(y, x, height, width, nw.point);
         }
         else {
-          if(a.point === b.point) {
-            fillSquare(a.y, a.x, 1, width, a.point);
-            points = points.filter(p => p.y >= a.point.y);
-          } else if(a.y !== 0) {
-            const m = checkHorizLine(a, b, points, true);
+          if(nw.point === ne.point) {
+            fillSquare(nw.y, nw.x, 1, width, nw.point);
+            points = points.filter(p => p.y >= nw.point.y);
+          } else if(nw.y !== 0) {
+            const m = checkHorizLine(nw, ne, points, true);
             points = points.filter(p => p.y >= m);
           }
-          if(b.point === d.point) {
-            fillSquare(b.y, b.x, height, 1, b.point);
-            points = points.filter(p => p.x <= b.point.x);
-          } else if(b.x !== outerWidth - 1) {
-            const m = checkVertLine(b, d, points, false);
+          if(ne.point === se.point) {
+            fillSquare(ne.y, ne.x, height, 1, ne.point);
+            points = points.filter(p => p.x <= ne.point.x);
+          } else if(ne.x !== outerWidth - 1) {
+            const m = checkVertLine(ne, se, points, false);
             points = points.filter(p => p.x <= m);
           }
-          if(c.point === d.point) {
-            fillSquare(c.y, c.x, 1, width, c.point);
-            points = points.filter(p => p.y <= c.point.y);
-          } else if(c.y !== outerHeight - 1) {
-            const m = checkHorizLine(c, d, points, false);
+          if(sw.point === se.point) {
+            fillSquare(sw.y, sw.x, 1, width, sw.point);
+            points = points.filter(p => p.y <= sw.point.y);
+          } else if(sw.y !== outerHeight - 1) {
+            const m = checkHorizLine(sw, se, points, false);
             points = points.filter(p => p.y <= m);
           }
-          if(a.point === c.point) {
-            fillSquare(a.y, a.x, height, 1, a.point);
-            points = points.filter(p => p.x >= a.point.x);
-          } else if(a.x !== 0) {
-            const m = checkVertLine(a, c, points, true);
+          if(nw.point === sw.point) {
+            fillSquare(nw.y, nw.x, height, 1, nw.point);
+            points = points.filter(p => p.x >= nw.point.x);
+          } else if(nw.x !== 0) {
+            const m = checkVertLine(nw, sw, points, true);
             points = points.filter(p => p.x >= m);
           }
           const halfWidth = Math.floor(width / 2);
