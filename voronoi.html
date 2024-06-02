@@ -325,10 +325,12 @@
             const m = checkVertLine(a, c, points, true);
             points = points.filter(p => p.x >= m);
           }
-          evaluateCorners(y, x, Math.floor(height / 2) || 1, Math.floor(width / 2) || 1, points);
-          evaluateCorners(y, x + Math.floor(width / 2), Math.floor(height / 2) || 1, Math.ceil(width / 2), points);
-          evaluateCorners(y + Math.floor(height / 2), x, Math.ceil(height / 2), Math.floor(width / 2) || 1, points);
-          evaluateCorners(y + Math.floor(height / 2), x + Math.floor(width / 2), Math.ceil(height / 2), Math.ceil(width / 2), points);
+          const halfWidth = Math.floor(width / 2);
+          const halfHeight = Math.floor(height / 2);
+          evaluateCorners(y, x, halfHeight || 1, halfWidth || 1, points);
+          evaluateCorners(y, x + halfWidth, halfHeight || 1, width - halfWidth, points);
+          evaluateCorners(y + halfHeight, x, height - halfHeight, halfWidth || 1, points);
+          evaluateCorners(y + halfHeight, x + halfWidth, height - halfHeight, width - halfWidth, points);
         }
       }
 
