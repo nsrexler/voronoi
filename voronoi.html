@@ -43,7 +43,7 @@
         canvas.getPoint = (x, y) => {
           if (canvas.image) {
             const i = 4 * (y * canvas.width + x);
-            const color = canvas.image.data.slice(i, i + 3);
+            const color = canvas.image.data.slice(i, i + 4);
             return new VorPoint(x, y, color);
           }
           else return new VorPoint(x, y);
@@ -232,7 +232,7 @@
     }
 
     function voronoiPixel(y, x, width, points) {
-      return [...findClosestPoint(points, x, y).colorArray, 0xFF];
+      return findClosestPoint(points, x, y).colorArray;
     }
 
     const runPixelWorkers = initPixelWorkers(voronoiPixel, [findClosestPoint, sqDistanceTo]);
@@ -247,7 +247,7 @@
     }
 
     function checkGrid(startY, startX, height, width, outerHeight, outerWidth, points) {
-      const pixelMap = [...Array(height)].map((_, y) => [...Array(width)].map((_, x) => ({y, x, point: undefined})));
+      const pixelMap = Array(height).fill(null).map((_, y) => Array(width).fill(null).map((_, x) => ({y, x, point: undefined})));
 
       function fillSquare(y, x, height, width, point) {
         for(let row = y; row < y + height; row++) {
@@ -349,7 +349,7 @@
       for (let y = 0; y < this.height; y++) {
         for (let x = 0; x < this.width; x++) {
           const closestPoint = pixelMap[y][x].point;
-          applyColorToImage(imgData, this.width, x, y, closestPoint?.colorArray ?? [0xFF, 0xFF, 0xFF]);
+          applyColorToImage(imgData, this.width, x, y, closestPoint?.colorArray ?? [0xFF, 0xFF, 0xFF, 0xFF]);
         }
       }
       this.ctx.putImageData(imgData, 0, 0);
@@ -366,7 +366,7 @@
       for (let y = 0; y < height; y++) {
         for (let x = 0; x < width; x++) {
           const closestPoint = pixelMap[y][x].point;
-          applyColorToImage(imgData, width, x, y, closestPoint?.colorArray ?? [0xFF, 0xFF, 0xFF]);
+          applyColorToImage(imgData, width, x, y, closestPoint?.colorArray ?? [0xFF, 0xFF, 0xFF, 0xFF]);
         }
       }
       return imgData;
@@ -435,11 +435,7 @@
     }
 
     function applyColorToImage(imgData, width, x, y, color) {
-      const i = 4 * (y * width + x);
-      imgData.data[i] = color[0];
-      imgData.data[i + 1] = color[1];
-      imgData.data[i + 2] = color[2];
-      imgData.data[i + 3] = 255;
+      imgData.data.set(color, 4 * (y * width + x));
     }
 
     function VorPoint(x, y, color) {
@@ -478,11 +474,11 @@
     }
 
     function randomColor() {
-      return [randomChannel(), randomChannel(), randomChannel()];
+      return [randomChannel(), randomChannel(), randomChannel(), 0xFF];
     }
 
     function colorFromArray(array) {
-      return "rgb(" + array.join(",") + ")";
+      return `rgb(${array.slice(0, 3).join(",")}, ${0xFF / array[3]})`;
     }
     //]]></script>
 </head>
