@@ -17,9 +17,9 @@
       vor.canvas.clearAll = clearAll;
       vor.canvas.drawPoints = drawPoints;
       //vor.canvas.fillAreas = fillAreasBrute;
-      vor.canvas.fillAreas = fillAreasGrid;
+      //vor.canvas.fillAreas = fillAreasGrid;
       //vor.canvas.fillAreas = fillAreasBruteParallel;
-      //vor.canvas.fillAreas = fillAreasGridParallel;
+      vor.canvas.fillAreas = fillAreasGridParallel;
       vor.pointCount = vor.querySelector(".pointCount");
       vor.canvas.addEventListener("click", addPoint);
       vor.canvas.addEventListener("dragover", function (evt) {
@@ -242,7 +242,7 @@
       console.log(`${elapsed / 1000}s`);
     }
 
-    function checkGrid(startY, startX, height, width, points) {
+    function checkGrid(startY, startX, height, width, outerHeight, outerWidth, points) {
       const pixelMap = [...Array(height)].map((_, y) => [...Array(width)].map((_, x) => ({y, x, point: undefined})));
 
       function fillSquare(y, x, height, width, point) {
@@ -283,9 +283,6 @@
         return m;
       }
 
-      const outerWidth = width;
-      const outerHeight = height;
-
       function evaluateCorners(y, x, height, width, points) {
         const nw = pixelMap[y][x];
         const ne = pixelMap[y][x + width - 1];
@@ -300,28 +297,28 @@
           if(nw.point === ne.point) {
             fillSquare(nw.y, nw.x, 1, width, nw.point);
             points = points.filter(p => p.y >= nw.point.y);
-          } else if(nw.y !== 0) {
+          } else if(nw.y + startY !== 0) {
             const m = checkHorizLine(nw, ne, points, true);
             points = points.filter(p => p.y >= m);
           }
           if(ne.point === se.point) {
             fillSquare(ne.y, ne.x, height, 1, ne.point);
             points = points.filter(p => p.x <= ne.point.x);
-          } else if(ne.x !== outerWidth - 1) {
+          } else if(ne.x + startX !== outerWidth - 1) {
             const m = checkVertLine(ne, se, points, false);
             points = points.filter(p => p.x <= m);
           }
           if(sw.point === se.point) {
             fillSquare(sw.y, sw.x, 1, width, sw.point);
             points = points.filter(p => p.y <= sw.point.y);
-          } else if(sw.y !== outerHeight - 1) {
+          } else if(sw.y + startY !== outerHeight - 1) {
             const m = checkHorizLine(sw, se, points, false);
             points = points.filter(p => p.y <= m);
           }
           if(nw.point === sw.point) {
             fillSquare(nw.y, nw.x, height, 1, nw.point);
             points = points.filter(p => p.x >= nw.point.x);
-          } else if(nw.x !== 0) {
+          } else if(nw.x + startX !== 0) {
             const m = checkVertLine(nw, sw, points, true);
             points = points.filter(p => p.x >= m);
           }
@@ -342,7 +339,7 @@
     function fillAreasGrid() {
       const startTime = new Date();
 
-      const pixelMap = checkGrid(0, 0, this.height, this.width, this.points);
+      const pixelMap = checkGrid(0, 0, this.height, this.width, this.height, this.width, this.points);
 
       const imgData = this.ctx.createImageData(this.width, this.height);
       for (let y = 0; y < this.height; y++) {
@@ -375,8 +372,8 @@
       console.log(`${elapsed / 1000}s`);
     }
 
-    function gridWorker(startY, startX, height, width, points) {
-      const pixelMap = checkGrid(startY, startX, height, width, points);
+    function gridWorker(startY, startX, height, width, outerHeight, outerWidth, points) {
+      const pixelMap = checkGrid(startY, startX, height, width, outerHeight, outerWidth, points);
 
       const imgData = new ImageData(width, height);
       for (let y = 0; y < height; y++) {
@@ -401,7 +398,7 @@
       await Promise.all(gridWorkers.map((worker, i) => {
         const startY = Math.floor(i / gridWidth) * chunkHeight;
         const startX = (i % gridWidth) * chunkWidth;
-        return worker.runAsync({startY, startX, height: chunkHeight, width: chunkWidth, points: this.points})
+        return worker.runAsync({startY, startX, height: chunkHeight, width: chunkWidth, outerHeight: this.height, outerWidth: this.width, points: this.points})
           .then(chunkImg => {
             for(let y = 0; y < chunkHeight; y++) {
               imgData.data.set(chunkImg.data.slice(4 * y * chunkWidth, 4 * (y + 1) * chunkWidth), 4 * ((y + startY) * this.width + startX));
