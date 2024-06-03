@@ -19,8 +19,8 @@
 
         //canvas.fillAreas = fillAreasBrute;
         //canvas.fillAreas = fillAreasBruteParallel;
-        //canvas.fillAreas = fillAreasGrid;
-        canvas.fillAreas = fillAreasGridParallel;
+        canvas.fillAreas = fillAreasGrid;
+        //canvas.fillAreas = fillAreasGridParallel;
 
         let _pointsDrawn = false;
         Object.defineProperty(canvas, "pointsDrawn", {
@@ -247,7 +247,13 @@
     }
 
     function checkGrid(startY, startX, height, width, outerHeight, outerWidth, points) {
-      const pixelMap = Array(height).fill(null).map((_, y) => Array(width).fill(null).map((_, x) => ({y, x, point: undefined})));
+      const pixelMap = Array(height);
+      for(let y = 0; y < height; y++) {
+        pixelMap[y] = Array(width);
+        for(let x = 0; x < width; x++) {
+          pixelMap[y][x] = {y, x, point: null};
+        }
+      }
 
       function fillSquare(y, x, height, width, point) {
         for(let row = y; row < y + height; row++) {
@@ -258,16 +264,32 @@
       }
 
       function findPoint(a, points) {
-        if(!a.point) {
+        if(a.point === null) {
           a.point = findClosestPoint(points, a.x + startX, a.y + startY);
         }
       }
 
+      function fillHorizLine(a, b, points) {
+        const length = b.x - a.x + 1;
+        findPoint(a, points);
+        findPoint(b, points);
+        if(length > 2) {
+          if(a.point === b.point) {
+            fillSquare(a.y, a.x, 1, length, a.point);
+          }
+          else {
+            const mid = pixelMap[a.y][a.x + Math.floor(length / 2)];
+            fillHorizLine(a, mid, points);
+            fillHorizLine(mid, b, points);
+          }
+        }
+      }
+
       function checkHorizLine(a, b, points, isMin) {
+        fillHorizLine(a, b, points);
         let m = a.point.y;
         for(let x = a.x; x <= b.x; x++) {
           const t = pixelMap[a.y][x];
-          findPoint(t, points);
           if(isMin ? t.point.y < m : t.point.y > m) {
             m = t.point.y;
           }
@@ -275,11 +297,27 @@
         return m;
       }
 
+      function fillVertLine(a, b, points) {
+        const length = b.y - a.y + 1;
+        findPoint(a, points);
+        findPoint(b, points);
+        if(length > 2) {
+          if(a.point === b.point) {
+            fillSquare(a.y, a.x, length, 1, a.point);
+          }
+          else {
+            const mid = pixelMap[a.y + Math.floor(length / 2)][a.x];
+            fillVertLine(a, mid, points);
+            fillVertLine(mid, b, points);
+          }
+        }
+      }
+
       function checkVertLine(a, b, points, isMin) {
+        fillVertLine(a, b, points);
         let m = a.point.x;
         for(let y = a.y; y <= b.y; y++) {
           const t = pixelMap[y][a.x];
-          findPoint(t, points);
           if(isMin ? t.point.x < m : t.point.x > m) {
             m = t.point.x;
           }
@@ -292,7 +330,10 @@
         const ne = pixelMap[y][x + width - 1];
         const sw = pixelMap[y + height - 1][x];
         const se = pixelMap[y + height - 1][x + width - 1];
-        [nw,ne,sw,se].forEach(corner => findPoint(corner, points));
+        findPoint(nw, points);
+        findPoint(ne, points);
+        findPoint(sw, points);
+        findPoint(se, points);
 
         if(nw.point === ne.point && ne.point === sw.point && sw.point === se.point) {
           fillSquare(y, x, height, width, nw.point);
