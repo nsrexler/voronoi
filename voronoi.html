@@ -6,47 +6,173 @@
   <script type="text/javascript">//<![CDATA[
     "use strict";
 
-    function initVoronoi(vor) {
-      vor.canvas = vor.querySelector("canvas");
-      resizeCanvas(vor.canvas);
+    window.addEventListener("load", function () {
+      document.querySelectorAll(".voronoi").forEach((vor) => {
+        const canvas = vor.querySelector("canvas");
+        resizeCanvas(canvas);
 
-      vor.canvas.ctx = vor.canvas.getContext("2d");
-      vor.canvas.points = [];
-      vor.canvas.isDrawn = false;
-      vor.canvas.getPoint = getPoint;
-      vor.canvas.clearAll = clearAll;
-      vor.canvas.drawPoints = drawPoints;
-      //vor.canvas.fillAreas = fillAreasBrute;
-      //vor.canvas.fillAreas = fillAreasGrid;
-      //vor.canvas.fillAreas = fillAreasBruteParallel;
-      vor.canvas.fillAreas = fillAreasGridParallel;
-      vor.pointCount = vor.querySelector(".pointCount");
-      vor.canvas.addEventListener("click", addPoint);
-      vor.canvas.addEventListener("dragover", function (evt) {
-        evt.preventDefault();
+        const drawBtn = vor.querySelector(".drawBtn");
+        const colorBtn = vor.querySelector(".colorChange");
+
+        canvas.ctx = canvas.getContext("2d");
+        canvas.points = [];
+
+        //canvas.fillAreas = fillAreasBrute;
+        //canvas.fillAreas = fillAreasBruteParallel;
+        //canvas.fillAreas = fillAreasGrid;
+        canvas.fillAreas = fillAreasGridParallel;
+
+        let _pointsDrawn = false;
+        Object.defineProperty(canvas, "pointsDrawn", {
+          get(){return _pointsDrawn;},
+          set(val){
+            drawBtn.disabled = !val;
+            _pointsDrawn = val;
+          }
+        });
+
+        let _isDrawn = false;
+        Object.defineProperty(canvas, "isDrawn", {
+          get() {return _isDrawn;},
+          set(val) {
+            colorBtn.disabled = !val;
+            _isDrawn = val;
+          }
+        });
+
+        canvas.getPoint = (x, y) => {
+          if (canvas.image) {
+            const i = 4 * (y * canvas.width + x);
+            const color = canvas.image.data.slice(i, i + 3);
+            return new VorPoint(x, y, color);
+          }
+          else return new VorPoint(x, y);
+        };
+        canvas.clearAll = () => {
+          canvas.isDrawn = false;
+          canvas.ctx.clearRect(0, 0, canvas.width, canvas.height);
+          if (canvas.imageBmp) {
+            canvas.ctx.save();
+            canvas.ctx.globalAlpha = 0.5;
+            canvas.ctx.drawImage(canvas.imageBmp, 0, 0);
+            canvas.ctx.restore();
+          }
+        };
+        canvas.drawPoints = (onlyLast) => {
+          const ctx = canvas.ctx;
+          ctx.fillStyle = "#000000";
+          if (onlyLast) {
+            const point = canvas.points[canvas.points.length - 1];
+            ctx.fillRect(point.x - 1, point.y - 1, 3, 3);
+          }
+          else {
+            canvas.points.forEach((point) => {
+              ctx.fillRect(point.x - 1, point.y - 1, 3, 3);
+            });
+          }
+          canvas.pointsDrawn = true;
+        };
+        
+        canvas.addEventListener("click", (evt) => {
+          const rect = canvas.getBoundingClientRect();
+          const x = evt.clientX - rect.left;
+          const y = evt.clientY - rect.top;
+          canvas.points.push(canvas.getPoint(x * window.devicePixelRatio, y * window.devicePixelRatio));
+          canvas.isDrawn ? canvas.fillAreas() : canvas.drawPoints(true);
+        });
+        canvas.addEventListener("dragover", (evt) => {evt.preventDefault();});
+        canvas.addEventListener("drop", (evt) => {
+          let imageFile = null;
+          for (const i = 0; i < evt.dataTransfer.files.length; i++) {
+            const curFile = evt.dataTransfer.files[i];
+            if (curFile.type.startsWith("image")) {
+              imageFile = curFile;
+              break;
+            }
+          }
+
+          if (imageFile) {
+            evt.preventDefault();
+          }
+          else return;
+
+          createImageBitmap(imageFile).then((imgBmp) => {
+            const hid = document.createElement("canvas");
+            hid.width = imgBmp.width;
+            hid.height = imgBmp.height;
+            hid.ctx = hid.getContext("2d");
+            hid.ctx.drawImage(imgBmp, 0, 0);
+            const imgData = hid.ctx.getImageData(0, 0, hid.width, hid.height);
+
+            canvas.width = hid.width;
+            canvas.height = hid.height;
+            if (window.devicePixelRatio !== 1) {
+              canvas.style.width = (canvas.width / window.devicePixelRatio) + "px";
+              canvas.style.height = (canvas.height / window.devicePixelRatio) + "px";
+            }
+            canvas.imageBmp = imgBmp;
+            canvas.image = imgData;
+            canvas.points = [];
+            canvas.clearAll();
+
+            document.getElementById("useAvgLbl").hidden = false;
+          });
+          //document.getElementById("testImage").src = URL.createObjectURL(imageFile);
+        });
+
+        const pointCount = vor.querySelector(".pointCount");
+        const genPoints = vor.querySelector(".genPoints");
+        genPoints.addEventListener("click", (evt) => {
+          const numPoints = pointCount.valueAsNumber;
+
+          canvas.points = new Array(numPoints);
+          for (let i = 0; i < numPoints; i++) {
+            canvas.points[i] = canvas.getPoint(Math.floor(Math.random() * canvas.width), Math.floor(Math.random() * canvas.height));
+          }
+
+          /*var pointSpacing = 20;
+          var isOdd = false;
+          for(var y = pointSpacing / 2; y < canvas.height; y += pointSpacing){
+            isOdd = !isOdd;
+            for(var x = isOdd ? pointSpacing : pointSpacing / 2; x < canvas.width; x += pointSpacing){
+              canvas.points.push(new VorPoint(x, y));
+            }
+          }*/
+
+          canvas.clearAll();
+          canvas.drawPoints();
+        });
+
+        drawBtn.addEventListener("click", (evt) => {
+          canvas.fillAreas();
+          canvas.isDrawn = true;
+        });
+
+        const clearBtn = vor.querySelector(".clear");
+        clearBtn.addEventListener("click", (evt) => {
+          canvas.points = [];
+          canvas.clearAll();
+          canvas.pointsDrawn = false;
+        });
+
+        
+        colorBtn.addEventListener("click", (evt) => {
+          canvas.points.forEach((point) => { point.colorArray = randomColor(); });
+          canvas.fillAreas();
+        });
+
+        const downBtn = vor.querySelector(".download");
+        downBtn.addEventListener("click", (evt) => {
+          canvas.toBlob((blob) => {
+            const imgUrl = URL.createObjectURL(blob);
+            const imgLink = document.querySelector("a.imgLink");
+            imgLink.href = imgUrl;
+            imgLink.download = "voronoi.png";
+            imgLink.click();
+          });
+        });
       });
-      vor.canvas.addEventListener("drop", dropImage);
-
-      const genPoints = vor.querySelector(".genPoints");
-      genPoints.vor = vor;
-      genPoints.addEventListener("click", generatePoints);
-
-      const drawBtn = vor.querySelector(".drawBtn");
-      drawBtn.vor = vor;
-      drawBtn.addEventListener("click", drawDiagram);
-
-      const clearBtn = vor.querySelector(".clear");
-      clearBtn.vor = vor;
-      clearBtn.addEventListener("click", clearPoints);
-
-      const colorBtn = vor.querySelector(".colorChange");
-      colorBtn.vor = vor;
-      colorBtn.addEventListener("click", changeColors);
-
-      const downBtn = vor.querySelector(".download");
-      downBtn.vor = vor;
-      downBtn.addEventListener("click", downloadImage);
-    }
+    })
 
     function resizeCanvas(canvas) {
       if (window.devicePixelRatio !== 1) {
@@ -55,142 +181,6 @@
         canvas.width *= window.devicePixelRatio;
         canvas.height *= window.devicePixelRatio;
       }
-    }
-
-    function generatePoints(evt) {
-      const vor = this.vor;
-
-      const numPoints = vor.pointCount.valueAsNumber;
-
-      vor.canvas.points = new Array(numPoints);
-      for (let i = 0; i < numPoints; i++) {
-        vor.canvas.points[i] = vor.canvas.getPoint(Math.floor(Math.random() * vor.canvas.width), Math.floor(Math.random() * vor.canvas.height));
-      }
-
-      /*var pointSpacing = 20;
-      var isOdd = false;
-      for(var y = pointSpacing / 2; y < vor.canvas.height; y += pointSpacing){
-        isOdd = !isOdd;
-        for(var x = isOdd ? pointSpacing : pointSpacing / 2; x < vor.canvas.width; x += pointSpacing){
-          vor.canvas.points.push(new VorPoint(x, y));
-        }
-      }*/
-
-      vor.canvas.clearAll();
-      vor.canvas.drawPoints();
-
-      vor.querySelector(".drawBtn").disabled = false;
-      vor.querySelector(".colorChange").disabled = true;
-    }
-
-    function clearAll() {
-      this.isDrawn = false;
-      this.ctx.clearRect(0, 0, this.width, this.height);
-      if (this.imageBmp) {
-        this.ctx.save();
-        this.ctx.globalAlpha = 0.5;
-        this.ctx.drawImage(this.imageBmp, 0, 0);
-        this.ctx.restore();
-      }
-    }
-
-    function getPoint(x, y) {
-      if (this.image) {
-        const i = 4 * (y * this.width + x);
-        const color = this.image.data.slice(i, i + 3);
-        return new VorPoint(x, y, color);
-      }
-      else return new VorPoint(x, y);
-    }
-
-    function drawPoints(onlyLast) {
-      const ctx = this.ctx;
-      ctx.fillStyle = "#000000";
-      if (onlyLast) {
-        const point = this.points[this.points.length - 1];
-        ctx.fillRect(point.x - 1, point.y - 1, 3, 3);
-      }
-      else {
-        this.points.forEach(function (point) {
-          ctx.fillRect(point.x - 1, point.y - 1, 3, 3);
-        });
-      }
-    }
-
-    function addPoint(evt) {
-      const rect = this.getBoundingClientRect();
-      const x = evt.clientX - rect.left;
-      const y = evt.clientY - rect.top;
-      this.points.push(this.getPoint(x * window.devicePixelRatio, y * window.devicePixelRatio));
-      this.isDrawn ? this.fillAreas() : this.drawPoints(true);
-    }
-
-    function dropImage(evt) {
-      let imageFile = null;
-      for (const i = 0; i < evt.dataTransfer.files.length; i++) {
-        const curFile = evt.dataTransfer.files[i];
-        if (curFile.type.startsWith("image")) {
-          imageFile = curFile;
-          break;
-        }
-      }
-
-      if (imageFile) {
-        evt.preventDefault();
-      }
-      else return;
-
-      const canv = this;
-
-      createImageBitmap(imageFile).then(function (imgBmp) {
-        const hid = document.createElement("canvas");
-        hid.width = imgBmp.width;
-        hid.height = imgBmp.height;
-        hid.ctx = hid.getContext("2d");
-        hid.ctx.drawImage(imgBmp, 0, 0);
-        const imgData = hid.ctx.getImageData(0, 0, hid.width, hid.height);
-
-        canv.width = hid.width;
-        canv.height = hid.height;
-        if (window.devicePixelRatio !== 1) {
-          this.style.width = (this.width / window.devicePixelRatio) + "px";
-          this.style.height = (this.height / window.devicePixelRatio) + "px";
-        }
-        canv.imageBmp = imgBmp;
-        canv.image = imgData;
-        canv.points = [];
-        canv.clearAll();
-
-        document.getElementById("useAvgLbl").hidden = false;
-      });
-      //document.getElementById("testImage").src = URL.createObjectURL(imageFile);
-    }
-
-    function drawDiagram(evt) {
-      this.vor.canvas.fillAreas();
-      this.vor.querySelector(".colorChange").disabled = false;
-    }
-
-    function clearPoints(evt) {
-      this.vor.canvas.points = [];
-      this.vor.canvas.clearAll();
-      this.vor.querySelector(".drawBtn").disabled = true;
-      this.vor.querySelector(".colorChange").disabled = true;
-    }
-
-    function changeColors(evt) {
-      this.vor.canvas.points.forEach(function (point) { point.colorArray = randomColor(); });
-      this.vor.canvas.fillAreas();
-    }
-
-    function downloadImage(evt) {
-      const data = this.vor.canvas.toBlob(function (blob) {
-        const imgUrl = URL.createObjectURL(blob);
-        const imgLink = document.querySelector("a.imgLink");
-        imgLink.href = imgUrl;
-        imgLink.download = "voronoi.png";
-        imgLink.click();
-      });
     }
 
     function fillAreasBrute() {
@@ -231,13 +221,27 @@
             colorTotal[1] += this.image.data[idx + 1];
             colorTotal[2] += this.image.data[idx + 2];
           }
-          const colorAvg = colorTotal.map(function (d) { return d / pxList.length; });
-          pxList.forEach(function (px) { applyColorToImage(imgData, cWidth, px.x, px.y, colorAvg); });
+          const colorAvg = colorTotal.map((d) => d / pxList.length);
+          pxList.forEach((px) => { applyColorToImage(imgData, cWidth, px.x, px.y, colorAvg); });
         }
       }
       this.ctx.putImageData(imgData, 0, 0);
       if (!this.image) this.drawPoints();
-      this.isDrawn = true;
+      const elapsed = (new Date()) - startTime;
+      console.log(`${elapsed / 1000}s`);
+    }
+
+    function voronoiPixel(y, x, width, points) {
+      return [...findClosestPoint(points, x, y).colorArray, 0xFF];
+    }
+
+    const runPixelWorkers = initPixelWorkers(voronoiPixel, [findClosestPoint, sqDistanceTo]);
+
+    async function fillAreasBruteParallel() {
+      const startTime = new Date();
+      const imgData = await runPixelWorkers(this.width, this.height, {points: this.points});
+      this.ctx.putImageData(imgData, 0, 0);
+      if (!this.image) this.drawPoints();
       const elapsed = (new Date()) - startTime;
       console.log(`${elapsed / 1000}s`);
     }
@@ -350,24 +354,7 @@
       }
       this.ctx.putImageData(imgData, 0, 0);
       if (!this.image) this.drawPoints();
-      this.isDrawn = true;
 
-      const elapsed = (new Date()) - startTime;
-      console.log(`${elapsed / 1000}s`);
-    }
-
-    function voronoiPixel(y, x, width, points) {
-      return [...findClosestPoint(points, x, y).colorArray, 0xFF];
-    }
-
-    const runPixelWorkers = initPixelWorkers(voronoiPixel, [findClosestPoint, sqDistanceTo]);
-
-    async function fillAreasBruteParallel() {
-      const startTime = new Date();
-      const imgData = await runPixelWorkers(this.width, this.height, {points: this.points});
-      this.ctx.putImageData(imgData, 0, 0);
-      if (!this.image) this.drawPoints();
-      this.isDrawn = true;
       const elapsed = (new Date()) - startTime;
       console.log(`${elapsed / 1000}s`);
     }
@@ -403,12 +390,12 @@
             for(let y = 0; y < chunkHeight; y++) {
               imgData.data.set(chunkImg.data.slice(4 * y * chunkWidth, 4 * (y + 1) * chunkWidth), 4 * ((y + startY) * this.width + startX));
             }
+            //this.ctx.putImageData(chunkImg, startX, startY);
           })
       }));
       this.ctx.putImageData(imgData, 0, 0);
 
       if (!this.image) this.drawPoints();
-      this.isDrawn = true;
 
       const elapsed = (new Date()) - startTime;
       console.log(`${elapsed / 1000}s`);
@@ -431,7 +418,6 @@
       }
       //window.requestAnimationFrame(fillAreasLines.bind(this));
       this.drawPoints();
-      this.isDrawn = true;
     }
 
     function findClosestPoint(points, x, y) {
@@ -498,10 +484,6 @@
     function colorFromArray(array) {
       return "rgb(" + array.join(",") + ")";
     }
-
-    window.addEventListener("load", function () {
-      document.querySelectorAll(".voronoi").forEach(initVoronoi);
-    })
     //]]></script>
 </head>
 
