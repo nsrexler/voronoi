@@ -21,8 +21,10 @@
 
         //canvas.fillAreas = fillAreasBrute;
         //canvas.fillAreas = fillAreasBruteParallel;
-        canvas.fillAreas = fillAreasGrid;
-        //canvas.fillAreas = fillAreasGridParallel;
+        //canvas.fillAreas = fillAreasGrid;
+        canvas.fillAreas = fillAreasGridParallel;
+
+        canvas.pixelMap = createPixelMap(canvas.height, canvas.width);
 
         let _pointsDrawn = false;
         Object.defineProperty(canvas, "pointsDrawn", {
@@ -112,6 +114,7 @@
               canvas.style.width = (canvas.width / SCALING_FACTOR) + "px";
               canvas.style.height = (canvas.height / SCALING_FACTOR) + "px";
             }
+            canvas.pixelMap = createPixelMap(canvas.height, canvas.width);
             canvas.imageBmp = imgBmp;
             canvas.image = imgData;
             canvas.points = [];
@@ -248,7 +251,7 @@
       console.log(`${elapsed / 1000}s`);
     }
 
-    function checkGrid(startY, startX, height, width, outerHeight, outerWidth, points) {
+    function createPixelMap(height, width) {
       const pixelMap = Array(height);
       for(let y = 0; y < height; y++) {
         pixelMap[y] = Array(width);
@@ -256,7 +259,19 @@
           pixelMap[y][x] = {y, x, point: null};
         }
       }
+      return pixelMap;
+    }
 
+    function clearPixelMap(pixelMap) {
+      for(let y = 0; y < pixelMap.length; y++) {
+        const row = pixelMap[y];
+        for(let x = 0; x < row.length; x++) {
+          row[x].point = null;
+        }
+      }
+    }
+
+    function checkGrid(startY, startX, height, width, outerHeight, outerWidth, points, pixelMap) {
       function fillSquare(y, x, height, width, point) {
         for(let row = y; row < y + height; row++) {
           for(let col = x; col < x + width; col++) {
@@ -379,19 +394,18 @@
       }
 
       evaluateCorners(0, 0, height, width, points);
-
-      return pixelMap;
     }
 
     function fillAreasGrid() {
       const startTime = new Date();
 
-      const pixelMap = checkGrid(0, 0, this.height, this.width, this.height, this.width, this.points);
+      clearPixelMap(this.pixelMap);
+      checkGrid(0, 0, this.height, this.width, this.height, this.width, this.points, this.pixelMap);
 
       const imgData = this.ctx.createImageData(this.width, this.height);
       for (let y = 0; y < this.height; y++) {
         for (let x = 0; x < this.width; x++) {
-          const closestPoint = pixelMap[y][x].point;
+          const closestPoint = this.pixelMap[y][x].point;
           applyColorToImage(imgData, this.width, x, y, closestPoint?.colorArray ?? [0xFF, 0xFF, 0xFF, 0xFF]);
         }
       }
@@ -403,7 +417,8 @@
     }
 
     function gridWorker(startY, startX, height, width, outerHeight, outerWidth, points) {
-      const pixelMap = checkGrid(startY, startX, height, width, outerHeight, outerWidth, points);
+      const pixelMap = createPixelMap(height, width);
+      checkGrid(startY, startX, height, width, outerHeight, outerWidth, points, pixelMap);
 
       const imgData = new ImageData(width, height);
       for (let y = 0; y < height; y++) {
@@ -417,7 +432,7 @@
 
     const gridWidth = 4;
     const gridHeight = 4;
-    const gridWorkers = initWorkers(gridWorker, [checkGrid, findClosestPoint, sqDistanceTo, applyColorToImage], undefined, gridHeight * gridWidth);
+    const gridWorkers = initWorkers(gridWorker, [checkGrid, createPixelMap, findClosestPoint, sqDistanceTo, applyColorToImage], undefined, gridHeight * gridWidth);
 
     async function fillAreasGridParallel() {
       const startTime = new Date();
