@@ -6,7 +6,7 @@
   <script type="text/javascript">//<![CDATA[
     "use strict";
 
-    const SCALING_FACTOR = window.devicePixelRatio;
+    const SCALING_FACTOR = window.devicePixelRatio * 4;
 
     window.addEventListener("load", function () {
       document.querySelectorAll(".voronoi").forEach((vor) => {
@@ -65,14 +65,15 @@
         canvas.drawPoints = (onlyLast) => {
           const ctx = canvas.ctx;
           ctx.fillStyle = "#000000";
+          function drawPoint(point) {
+            const radius = Math.ceil(SCALING_FACTOR / 2);
+            ctx.fillRect(point.x - radius, point.y - radius, 2 * radius + 1, 2 * radius + 1);
+          }
           if (onlyLast) {
-            const point = canvas.points[canvas.points.length - 1];
-            ctx.fillRect(point.x - 1, point.y - 1, 3, 3);
+            drawPoint(canvas.points[canvas.points.length - 1]);
           }
           else {
-            canvas.points.forEach((point) => {
-              ctx.fillRect(point.x - 1, point.y - 1, 3, 3);
-            });
+            canvas.points.forEach(drawPoint);
           }
           canvas.pointsDrawn = true;
         };
@@ -403,9 +404,10 @@
       checkGrid(0, 0, this.height, this.width, this.height, this.width, this.points, this.pixelMap);
 
       const imgData = this.ctx.createImageData(this.width, this.height);
-      for (let y = 0; y < this.height; y++) {
-        for (let x = 0; x < this.width; x++) {
-          const closestPoint = this.pixelMap[y][x].point;
+      for (let y = 0; y < this.pixelMap.length; y++) {
+        const row = this.pixelMap[y];
+        for (let x = 0; x < row.length; x++) {
+          const closestPoint = row[x].point;
           applyColorToImage(imgData, this.width, x, y, closestPoint?.colorArray ?? [0xFF, 0xFF, 0xFF, 0xFF]);
         }
       }
