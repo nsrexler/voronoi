@@ -22,9 +22,9 @@
 
         //canvas.fillAreas = fillAreasBrute;
         //canvas.fillAreas = fillAreasBruteParallel;
-        canvas.fillAreas = fillAreasGrid;
+        //canvas.fillAreas = fillAreasGrid;
         //canvas.fillAreas = fillAreasGridParallel;
-        //canvas.fillAreas = fillRegionsDelauney;
+        canvas.fillAreas = fillRegionsDelauney;
 
         if(canvas.fillAreas === fillAreasGrid) {
           canvas.pixelMap = createPixelMap(canvas.height, canvas.width);
@@ -187,8 +187,13 @@
         const zoomBtn = vor.querySelector(".zoomOut");
         zoomBtn.addEventListener("click", () => {
           canvas.points.forEach(p => {
-            p.x = (p.x / ZOOM_FACTOR) + ((canvas.width / 2) - (canvas.width / (2 * ZOOM_FACTOR)));
-            p.y = (p.y / ZOOM_FACTOR) + ((canvas.height / 2) - (canvas.height / (2 * ZOOM_FACTOR)));
+            p.x = Math.round((p.x / ZOOM_FACTOR) + ((canvas.width / 2) - (canvas.width / (2 * ZOOM_FACTOR))));
+            p.y = Math.round((p.y / ZOOM_FACTOR) + ((canvas.height / 2) - (canvas.height / (2 * ZOOM_FACTOR))));
+            if (canvas.image) {
+              const i = 4 * (p.y * canvas.width + p.x);
+              p.colorArray = canvas.image.data.slice(i, i + 4);
+              p.color = colorFromArray(p.colorArray);
+            }
           });
           if(canvas.isDrawn) {
             canvas.fillAreas();
@@ -561,7 +566,19 @@
           diff.y = -diff.y;
         }
 
-        const inf = {x: c.x + 1000 * diff.x, y: c.y + 1000 * diff.y};
+        let xBound = diff.x < 0 ? 0 : this.width;
+        let yBound = diff.y < 0 ? 0 : this.height;
+        if(diff.x === 0) {
+          yBound += Math.sign(diff.y) * 10 * this.height;
+        }
+        if(diff.y === 0) {
+          xBound += Math.sign(diff.x) * 10 * this.width;
+        }
+        const xHit = diff.x !== 0 ? (xBound - c.x)/diff.x : 0;
+        const yHit = diff.y !== 0 ? (yBound - c.y)/diff.y : 0;
+        const t = Math.max(xHit, yHit);
+
+        const inf = {x: c.x + t * diff.x, y: c.y + t * diff.y};
 
         const fake = {circumcenter: inf, fake: true};
 
@@ -570,6 +587,7 @@
       }
 
       this.ctx.strokeStyle = "black";
+      this.ctx.lineWidth = 1;
       const drawRegion = (region, i) => {
         const point = this.points[i];
         const fixRegion = region.map(t => ({...t.circumcenter, angle: Math.atan2((t.circumcenter.y - point.y),(t.circumcenter.x - point.x))}))
@@ -577,7 +595,7 @@
           return a.angle - b.angle;
         })
         this.ctx.fillStyle = point.color;
-        //this.ctx.strokeStyle = point.color;
+        this.ctx.strokeStyle = point.color;
         this.ctx.beginPath();
         fixRegion.forEach((circumcenter, j) => {
           if(j === 0) {
@@ -588,8 +606,8 @@
           }
         });
         this.ctx.closePath();
-        this.ctx.stroke();
         this.ctx.fill();
+        this.ctx.stroke();
       };
       vorRegions.forEach(drawRegion);
 
