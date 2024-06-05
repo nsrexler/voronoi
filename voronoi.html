@@ -22,11 +22,13 @@
 
         //canvas.fillAreas = fillAreasBrute;
         //canvas.fillAreas = fillAreasBruteParallel;
-        //canvas.fillAreas = fillAreasGrid;
+        canvas.fillAreas = fillAreasGrid;
         //canvas.fillAreas = fillAreasGridParallel;
-        canvas.fillAreas = fillRegionsDelauney;
+        //canvas.fillAreas = fillRegionsDelauney;
 
-        canvas.pixelMap = createPixelMap(canvas.height, canvas.width);
+        if(canvas.fillAreas === fillAreasGrid) {
+          canvas.pixelMap = createPixelMap(canvas.height, canvas.width);
+        }
 
         let _pointsDrawn = false;
         Object.defineProperty(canvas, "pointsDrawn", {
@@ -179,6 +181,22 @@
             imgLink.click();
           });
         });
+
+        const ZOOM_FACTOR = 2;
+
+        const zoomBtn = vor.querySelector(".zoomOut");
+        zoomBtn.addEventListener("click", () => {
+          canvas.points.forEach(p => {
+            p.x = (p.x / ZOOM_FACTOR) + ((canvas.width / 2) - (canvas.width / (2 * ZOOM_FACTOR)));
+            p.y = (p.y / ZOOM_FACTOR) + ((canvas.height / 2) - (canvas.height / (2 * ZOOM_FACTOR)));
+          });
+          if(canvas.isDrawn) {
+            canvas.fillAreas();
+          } else {
+            canvas.clearAll();
+            canvas.drawPoints();
+          }
+        })
       });
     })
 
@@ -654,6 +672,7 @@
       <br />
       <button class="genPoints">Place Points</button>
       <button class="drawBtn" disabled>Draw Diagram</button>
+      <button class="zoomOut">Zoom Out</button>
       <button class="clear">Clear</button>
       <button class="colorChange" disabled>Change Colors</button>
       <button class="download">Download Image</button>
