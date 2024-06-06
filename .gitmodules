@@ -1,0 +1,6 @@
+[submodule "2DShader"]
+	path = 2DShader
+	url = git@github.com:nsrexler/2DShader.git
+[submodule "parallelWorkers"]
+	path = parallelWorkers
+	url = git@github.com:nsrexler/parallelWorkers.git
