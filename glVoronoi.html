@@ -105,13 +105,14 @@
         function drawPoints(onlyLast) {
             const gl = this.gl;
 
-            const fsSource = `
+            const fsSource = `#version 300 es
             precision mediump float;
             uniform vec2 resolution;
             const int pointCount = ${this.points.length};
             const float textureWidth = 100.0;
             uniform sampler2D u_pointTexture;
             uniform float pointTextureHeight;
+            out vec4 vorColor;
 
             vec2 getPoint(float index) {
                 float column = mod(index, textureWidth);
@@ -119,14 +120,14 @@
                 vec2 uv = vec2(
                     (column + 0.5) / textureWidth,
                     (row    + 0.5) / pointTextureHeight);
-                return texture2D(u_pointTexture, uv).xy * resolution;
+                return texture(u_pointTexture, uv).xy * resolution;
             }
 
             void main() {
                 for(int i = 0; i < pointCount; i++) {
                     float distance = distance(getPoint(float(i)), gl_FragCoord.xy);
                     if(distance <= 2.0) {
-                        gl_FragColor = vec4(0.0, 0.0, 0.0, 1.0);
+                        vorColor = vec4(0.0, 0.0, 0.0, 1.0);
                     }
                 }
             }
@@ -233,7 +234,7 @@
             const startTime = new Date();
             const gl = this.gl;
 
-            const fsSource = `
+            const fsSource = `#version 300 es
             precision mediump float;
             uniform vec2 resolution;
             const int pointCount = ${this.points.length};
@@ -242,6 +243,7 @@
             uniform float pointTextureHeight;
             uniform sampler2D u_colorTexture;
             uniform float colorTextureHeight;
+            out vec4 vorColor;
 
             vec2 getPoint(float index) {
                 float column = mod(index, textureWidth);
@@ -249,7 +251,7 @@
                 vec2 uv = vec2(
                     (column + 0.5) / textureWidth,
                     (row    + 0.5) / pointTextureHeight);
-                return texture2D(u_pointTexture, uv).xy * resolution;
+                return texture(u_pointTexture, uv).xy * resolution;
             }
 
             vec4 getColor(float index) {
@@ -258,13 +260,12 @@
                 vec2 uv = vec2(
                     (column + 0.5) / textureWidth,
                     (row    + 0.5) / colorTextureHeight);
-                return texture2D(u_colorTexture, uv);
+                return texture(u_colorTexture, uv);
             }
 
             void main() {
                 int closestPoint = -1;
                 float closestDistance;
-                vec4 color;
                 for(int i = 0; i < pointCount; i++) {
                     float distance = distance(getPoint(float(i)), gl_FragCoord.xy);
                     //vec2 d = abs(getPoint(float(i)) - gl_FragCoord.xy);
@@ -272,14 +273,12 @@
                     if(closestPoint == -1 || closestDistance > distance) {
                         closestPoint = i;
                         closestDistance = distance;
-                        color = getColor(float(i));
+                        vorColor = getColor(float(i));
                         if(distance <= 2.0) {
-                            color = vec4(0.0, 0.0, 0.0, 1.0);
+                            vorColor = vec4(0.0, 0.0, 0.0, 1.0);
                         }
                     }
                 }
-
-                gl_FragColor = color;
             }
             `;
 
