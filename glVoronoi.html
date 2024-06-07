@@ -226,7 +226,6 @@
         }
 
         function fillAreasGl() {
-            const startTime = new Date();
             const gl = this.gl;
 
             const fsSource = `#version 300 es
@@ -305,9 +304,6 @@
             });
 
             this.isDrawn = true;
-
-            const elapsed = (new Date()) - startTime;
-            console.log(`${elapsed / 1000}s`);
         }
 
         function VorPoint(x, y, color) {
