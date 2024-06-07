@@ -109,23 +109,20 @@
             precision mediump float;
             uniform vec2 resolution;
             const int pointCount = ${this.points.length};
-            const float textureWidth = 100.0;
+            const int textureWidth = 100;
             uniform sampler2D u_pointTexture;
-            uniform float pointTextureHeight;
             out vec4 vorColor;
 
-            vec2 getPoint(float index) {
-                float column = mod(index, textureWidth);
-                float row    = floor(index / textureWidth);
-                vec2 uv = vec2(
-                    (column + 0.5) / textureWidth,
-                    (row    + 0.5) / pointTextureHeight);
-                return texture(u_pointTexture, uv).xy * resolution;
+            vec2 getPoint(int index) {
+                int column = index % textureWidth;
+                int row    = index / textureWidth;
+                ivec2 uv = ivec2(column, row);
+                return texelFetch(u_pointTexture, uv, 0).xy * resolution;
             }
 
             void main() {
                 for(int i = 0; i < pointCount; i++) {
-                    float distance = distance(getPoint(float(i)), gl_FragCoord.xy);
+                    float distance = distance(getPoint(i), gl_FragCoord.xy);
                     if(distance <= 2.0) {
                         vorColor = vec4(0.0, 0.0, 0.0, 1.0);
                     }
@@ -145,8 +142,6 @@
                 gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
                 gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
                 gl.texImage2D(gl.TEXTURE_2D, 0, gl.RG16F, textureWidth, pointHeight, 0, gl.RG, gl.FLOAT, pointData);
-                gl.uniform1f(gl.getUniformLocation(shaderProgram, "pointTextureHeight"), pointHeight);
-
                 gl.uniform1i(gl.getUniformLocation(shaderProgram, "u_pointTexture"), 0);  // texture unit 0
 
                 gl.activeTexture(gl.TEXTURE0);
@@ -238,42 +233,36 @@
             precision mediump float;
             uniform vec2 resolution;
             const int pointCount = ${this.points.length};
-            const float textureWidth = 100.0;
+            const int textureWidth = 100;
             uniform sampler2D u_pointTexture;
-            uniform float pointTextureHeight;
             uniform sampler2D u_colorTexture;
-            uniform float colorTextureHeight;
             out vec4 vorColor;
 
-            vec2 getPoint(float index) {
-                float column = mod(index, textureWidth);
-                float row    = floor(index / textureWidth);
-                vec2 uv = vec2(
-                    (column + 0.5) / textureWidth,
-                    (row    + 0.5) / pointTextureHeight);
-                return texture(u_pointTexture, uv).xy * resolution;
+            vec2 getPoint(int index) {
+                int column = index % textureWidth;
+                int row    = index / textureWidth;
+                ivec2 uv = ivec2(column, row);
+                return texelFetch(u_pointTexture, uv, 0).xy * resolution;
             }
 
-            vec4 getColor(float index) {
-                float column = mod(index, textureWidth);
-                float row    = floor(index / textureWidth);
-                vec2 uv = vec2(
-                    (column + 0.5) / textureWidth,
-                    (row    + 0.5) / colorTextureHeight);
-                return texture(u_colorTexture, uv);
+            vec4 getColor(int index) {
+                int column = index % textureWidth;
+                int row    = index / textureWidth;
+                ivec2 uv = ivec2(column, row);
+                return texelFetch(u_colorTexture, uv, 0);
             }
 
             void main() {
                 int closestPoint = -1;
                 float closestDistance;
                 for(int i = 0; i < pointCount; i++) {
-                    float distance = distance(getPoint(float(i)), gl_FragCoord.xy);
-                    //vec2 d = abs(getPoint(float(i)) - gl_FragCoord.xy);
+                    float distance = distance(getPoint(i), gl_FragCoord.xy);
+                    //vec2 d = abs(getPoint(i) - gl_FragCoord.xy);
                     //float distance = d.x + d.y;
                     if(closestPoint == -1 || closestDistance > distance) {
                         closestPoint = i;
                         closestDistance = distance;
-                        vorColor = getColor(float(i));
+                        vorColor = getColor(i);
                         if(distance <= 2.0) {
                             vorColor = vec4(0.0, 0.0, 0.0, 1.0);
                         }
@@ -294,7 +283,6 @@
                 gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
                 gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
                 gl.texImage2D(gl.TEXTURE_2D, 0, gl.RG16F, textureWidth, pointHeight, 0, gl.RG, gl.FLOAT, pointData);
-                gl.uniform1f(gl.getUniformLocation(shaderProgram, "pointTextureHeight"), pointHeight);
 
                 const colorData = new Uint8Array([...this.points.flatMap(point => [...point.colorArray, 0xFF]), ...(new Array(4 * (textureWidth - (this.points.length % textureWidth)))).fill(0xFF)]);
                 const colorHeight = Math.ceil(colorData.length / (4.0 * textureWidth));
@@ -305,7 +293,6 @@
                 gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
                 gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
                 gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, textureWidth, colorHeight, 0, gl.RGBA, gl.UNSIGNED_BYTE, colorData);
-                gl.uniform1f(gl.getUniformLocation(shaderProgram, "colorTextureHeight"), colorHeight);
 
                 gl.uniform1i(gl.getUniformLocation(shaderProgram, "u_pointTexture"), 0);  // texture unit 0
                 gl.uniform1i(gl.getUniformLocation(shaderProgram, "u_colorTexture"), 1);  // texture unit 1
