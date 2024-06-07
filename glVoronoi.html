@@ -109,7 +109,7 @@
             precision mediump float;
             uniform vec2 resolution;
             const int pointCount = ${this.points.length};
-            const int textureWidth = 100;
+            const int textureWidth = ${textureWidth};
             uniform sampler2D u_pointTexture;
             out vec4 vorColor;
 
@@ -233,23 +233,23 @@
             precision mediump float;
             uniform vec2 resolution;
             const int pointCount = ${this.points.length};
-            const int textureWidth = 100;
+            const int textureWidth = ${textureWidth};
             uniform sampler2D u_pointTexture;
             uniform sampler2D u_colorTexture;
             out vec4 vorColor;
 
-            vec2 getPoint(int index) {
+            ivec2 arrayPos(int index) {
                 int column = index % textureWidth;
                 int row    = index / textureWidth;
-                ivec2 uv = ivec2(column, row);
-                return texelFetch(u_pointTexture, uv, 0).xy * resolution;
+                return ivec2(column, row);
+            }
+
+            vec2 getPoint(int index) {
+                return texelFetch(u_pointTexture, arrayPos(index), 0).xy * resolution;
             }
 
             vec4 getColor(int index) {
-                int column = index % textureWidth;
-                int row    = index / textureWidth;
-                ivec2 uv = ivec2(column, row);
-                return texelFetch(u_colorTexture, uv, 0);
+                return texelFetch(u_colorTexture, arrayPos(index), 0);
             }
 
             void main() {
